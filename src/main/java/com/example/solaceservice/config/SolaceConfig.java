@@ -9,7 +9,7 @@ import org.springframework.jms.annotation.EnableJms;
 import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
 import org.springframework.jms.core.JmsTemplate;
 
-import javax.jms.ConnectionFactory;
+import jakarta.jms.ConnectionFactory;
 
 @Configuration
 @EnableJms
@@ -28,13 +28,13 @@ public class SolaceConfig {
     private String vpnName;
 
     @Bean
-    public ConnectionFactory connectionFactory() {
+    public ConnectionFactory connectionFactory() throws Exception {
         SolConnectionFactory connectionFactory = SolJmsUtility.createConnectionFactory();
         connectionFactory.setHost(host);
         connectionFactory.setUsername(username);
         connectionFactory.setPassword(password);
         connectionFactory.setVPN(vpnName);
-        return connectionFactory;
+        return (ConnectionFactory) connectionFactory;
     }
 
     @Bean
