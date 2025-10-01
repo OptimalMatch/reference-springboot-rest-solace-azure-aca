@@ -18,8 +18,8 @@ services:
     ulimits:
       core: -1
       nofile:
-        soft: 2448
-        hard: 38048
+        soft: 65536
+        hard: 1048576
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health-check/guaranteed-active"]
       interval: 30s
