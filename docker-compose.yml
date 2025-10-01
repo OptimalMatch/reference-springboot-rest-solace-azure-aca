@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  solace-broker:
+    image: solace/solace-pubsub-standard:latest
+    container_name: solace-broker
+    hostname: solace-broker
+    ports:
+      - "8080:8080"   # Web admin console
+      - "55555:55555" # SMF port
+      - "8008:8008"   # Web messaging
+      - "1943:1943"   # MQTT port
+      - "8443:8443"   # Web admin HTTPS
+      - "9443:9443"   # REST messaging HTTPS
+    environment:
+      - username_admin_globalaccesslevel=admin
+      - username_admin_password=admin
+      - system_scaling_maxconnectioncount=100
+    volumes:
+      - solace-data:/usr/sw/jail/logs
+      - solace-config:/usr/sw/jail/var
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health-check/guaranteed-active"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  solace-service:
+    build: .
+    container_name: solace-service-app
+    ports:
+      - "8090:8080"  # App on different port to avoid conflict with Solace admin
+    environment:
+      - SOLACE_ENABLED=true
+      - SOLACE_HOST=tcp://solace-broker:55555
+      - SOLACE_USERNAME=default
+      - SOLACE_PASSWORD=default
+      - SOLACE_VPN=default
+      - SOLACE_QUEUE_NAME=test.queue
+      - SOLACE_TOPIC=test/topic
+    depends_on:
+      solace-broker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  solace-data:
+  solace-config:

@@ -26,6 +26,9 @@ docker run -d \
 echo "✅ Container started successfully!"
 echo "📍 Application is available at: http://localhost:${PORT}"
 echo "🔍 Health check: http://localhost:${PORT}/actuator/health"
+echo ""
+echo "ℹ️  Note: This runs the app WITHOUT Solace broker (messages are logged only)"
+echo "   To run WITH Solace broker, use: ./run-with-solace.sh"
 
 echo ""
 echo "Useful commands:"

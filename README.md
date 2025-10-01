@@ -42,8 +42,30 @@ The service can be configured via environment variables:
 
 ## Running Locally
 
+### Option 1: Spring Boot Application Only
 ```bash
 ./gradlew bootRun
+```
+
+### Option 2: Docker Container (No Solace broker)
+```bash
+./run-container.sh
+```
+Application runs at http://localhost:8080. Messages are logged but not sent to any broker.
+
+### Option 3: Full Setup with Solace Broker (Recommended)
+```bash
+./run-with-solace.sh
+```
+This starts both the application and a Solace PubSub+ broker using Docker Compose:
+- **Application**: http://localhost:8090
+- **Solace Admin Console**: http://localhost:8080 (admin/admin)
+
+Test messaging:
+```bash
+curl -X POST http://localhost:8090/api/messages \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Hello Solace!","destination":"test.queue"}'
 ```
 
 ## Testing
