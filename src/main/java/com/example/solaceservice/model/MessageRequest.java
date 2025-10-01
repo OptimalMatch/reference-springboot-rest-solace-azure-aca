@@ -2,7 +2,7 @@ package com.example.solaceservice.model;
 
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 @Data
 public class MessageRequest {
