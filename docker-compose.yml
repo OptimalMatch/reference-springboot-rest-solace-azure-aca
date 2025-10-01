@@ -21,11 +21,11 @@ services:
         soft: 65536
         hard: 1048576
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health-check/guaranteed-active"]
+      test: ["CMD", "bash", "-c", "timeout 3 bash -c '</dev/tcp/localhost/55555'"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
   solace-service:
     build: .
