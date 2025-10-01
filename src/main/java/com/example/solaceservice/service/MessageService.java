@@ -1,9 +1,10 @@
 package com.example.solaceservice.service;
 
 import com.example.solaceservice.model.MessageRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.core.MessageCreator;
 import org.springframework.stereotype.Service;
@@ -14,16 +15,23 @@ import jakarta.jms.Session;
 import jakarta.jms.TextMessage;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class MessageService {
 
-    private final JmsTemplate jmsTemplate;
+    @Autowired(required = false)
+    private JmsTemplate jmsTemplate;
 
     @Value("${solace.queue.name}")
     private String defaultQueue;
 
     public void sendMessage(MessageRequest request, String messageId) {
+        if (jmsTemplate == null) {
+            log.warn("JMS Template not available - Solace is not configured. Message would be sent to: {} with content: {}",
+                    request.getDestination() != null ? request.getDestination() : defaultQueue,
+                    request.getContent());
+            return;
+        }
+
         String destination = request.getDestination() != null ? request.getDestination() : defaultQueue;
 
         log.info("Sending message to queue: {}", destination);

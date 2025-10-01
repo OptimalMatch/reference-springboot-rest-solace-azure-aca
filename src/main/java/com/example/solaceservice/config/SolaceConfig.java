@@ -3,6 +3,7 @@ package com.example.solaceservice.config;
 import com.solacesystems.jms.SolConnectionFactory;
 import com.solacesystems.jms.SolJmsUtility;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jms.annotation.EnableJms;
@@ -13,6 +14,7 @@ import jakarta.jms.ConnectionFactory;
 
 @Configuration
 @EnableJms
+@ConditionalOnProperty(name = "spring.jms.solace.enabled", havingValue = "true", matchIfMissing = false)
 public class SolaceConfig {
 
     @Value("${spring.jms.solace.host}")
@@ -29,12 +31,15 @@ public class SolaceConfig {
 
     @Bean
     public ConnectionFactory connectionFactory() throws Exception {
-        SolConnectionFactory connectionFactory = SolJmsUtility.createConnectionFactory();
-        connectionFactory.setHost(host);
-        connectionFactory.setUsername(username);
-        connectionFactory.setPassword(password);
-        connectionFactory.setVPN(vpnName);
-        return (ConnectionFactory) connectionFactory;
+        SolConnectionFactory solConnectionFactory = SolJmsUtility.createConnectionFactory();
+        solConnectionFactory.setHost(host);
+        solConnectionFactory.setUsername(username);
+        solConnectionFactory.setPassword(password);
+        solConnectionFactory.setVPN(vpnName);
+
+        // Return the connection factory without explicit casting
+        // The Solace connection factory should implement Jakarta JMS interfaces
+        return solConnectionFactory;
     }
 
     @Bean

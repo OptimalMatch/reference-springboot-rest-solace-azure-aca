@@ -3,6 +3,7 @@ spring:
     name: solace-service
   jms:
     solace:
+      enabled: ${SOLACE_ENABLED:false}
       host: ${SOLACE_HOST:tcp://localhost:55555}
       username: ${SOLACE_USERNAME:default}
       password: ${SOLACE_PASSWORD:default}
