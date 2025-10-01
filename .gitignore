@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Spring Boot
+application-local.properties
+application-local.yml
+
+# Logs
+logs/
+*.log
+
+# Secrets and credentials
+.ssh/
+.claude/
+*.pem
+*.key
+*.p12
+*.jks

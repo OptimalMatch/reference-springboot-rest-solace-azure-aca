@@ -1,0 +1,39 @@
+apiVersion: apps/v1alpha1
+kind: ContainerApp
+metadata:
+  name: solace-service
+spec:
+  resourceGroup: your-resource-group
+  containerAppEnvironment: your-container-app-environment
+  template:
+    containers:
+    - name: solace-service
+      image: your-acr.azurecr.io/solace-service:latest
+      resources:
+        cpu: 0.5
+        memory: 1Gi
+      env:
+      - name: SOLACE_HOST
+        value: "tcp://your-solace-broker:55555"
+      - name: SOLACE_USERNAME
+        secretRef: solace-username
+      - name: SOLACE_PASSWORD
+        secretRef: solace-password
+      - name: SOLACE_VPN
+        value: "your-vpn-name"
+      - name: SOLACE_QUEUE_NAME
+        value: "your.queue.name"
+    scale:
+      minReplicas: 1
+      maxReplicas: 10
+      rules:
+      - name: http-scale-rule
+        http:
+          metadata:
+            concurrentRequests: "10"
+  ingress:
+    external: true
+    targetPort: 8080
+    traffic:
+    - weight: 100
+      latestRevision: true

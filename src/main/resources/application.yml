@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: solace-service
+  jms:
+    solace:
+      host: ${SOLACE_HOST:tcp://localhost:55555}
+      username: ${SOLACE_USERNAME:default}
+      password: ${SOLACE_PASSWORD:default}
+      vpn-name: ${SOLACE_VPN:default}
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.example.solaceservice: DEBUG
+    com.solacesystems: INFO
+
+solace:
+  queue:
+    name: ${SOLACE_QUEUE_NAME:test.queue}
+    topic: ${SOLACE_TOPIC:test/topic}
