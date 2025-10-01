@@ -20,7 +20,7 @@ public class MessageController {
 
     private final MessageService messageService;
 
-    @PostMapping("/send")
+    @PostMapping
     public ResponseEntity<MessageResponse> sendMessage(@Valid @RequestBody MessageRequest request) {
         log.info("Received message request: {}", request);
 
