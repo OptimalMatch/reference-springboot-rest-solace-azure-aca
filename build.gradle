@@ -24,7 +24,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'com.solacesystems:sol-jms:10.24.0'
+    implementation 'com.solacesystems:sol-jms-jakarta:10.28.1'
     implementation 'org.springframework:spring-jms'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'jakarta.jms:jakarta.jms-api:3.1.0'
