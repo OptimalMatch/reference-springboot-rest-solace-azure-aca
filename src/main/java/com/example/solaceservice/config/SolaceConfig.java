@@ -45,8 +45,8 @@ public class SolaceConfig {
     @Bean
     public JmsTemplate jmsTemplate(ConnectionFactory connectionFactory) {
         JmsTemplate jmsTemplate = new JmsTemplate(connectionFactory);
-        jmsTemplate.setPubSubDomain(false); // Use queues, not topics
-        jmsTemplate.setDeliveryPersistent(true);
+        jmsTemplate.setPubSubDomain(true); // Use topics for auto-creation
+        jmsTemplate.setDeliveryPersistent(false); // Use direct messaging
         return jmsTemplate;
     }
 
@@ -54,8 +54,8 @@ public class SolaceConfig {
     public DefaultJmsListenerContainerFactory jmsListenerContainerFactory(ConnectionFactory connectionFactory) {
         DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
-        factory.setPubSubDomain(false); // Use queues, not topics
-        factory.setSessionTransacted(true);
+        factory.setPubSubDomain(true); // Use topics for auto-creation
+        factory.setSessionTransacted(false); // Disable transactions for direct transport
         return factory;
     }
 }

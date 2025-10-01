@@ -38,7 +38,7 @@ services:
       - SOLACE_USERNAME=default
       - SOLACE_PASSWORD=default
       - SOLACE_VPN=default
-      - SOLACE_QUEUE_NAME=test.queue
+      - SOLACE_QUEUE_NAME=test/topic
       - SOLACE_TOPIC=test/topic
     depends_on:
       solace-broker:

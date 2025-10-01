@@ -28,5 +28,5 @@ logging:
 
 solace:
   queue:
-    name: ${SOLACE_QUEUE_NAME:test.queue}
+    name: ${SOLACE_QUEUE_NAME:test/topic}
     topic: ${SOLACE_TOPIC:test/topic}
