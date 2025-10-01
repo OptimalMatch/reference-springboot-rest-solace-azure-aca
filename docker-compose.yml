@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   solace-broker:
     image: solace/solace-pubsub-standard:latest
@@ -16,9 +14,12 @@ services:
       - username_admin_globalaccesslevel=admin
       - username_admin_password=admin
       - system_scaling_maxconnectioncount=100
-    volumes:
-      - solace-data:/usr/sw/jail/logs
-      - solace-config:/usr/sw/jail/var
+    shm_size: 2g
+    ulimits:
+      core: -1
+      nofile:
+        soft: 2448
+        hard: 38048
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health-check/guaranteed-active"]
       interval: 30s
@@ -49,6 +50,3 @@ services:
       retries: 5
       start_period: 30s
 
-volumes:
-  solace-data:
-  solace-config:
