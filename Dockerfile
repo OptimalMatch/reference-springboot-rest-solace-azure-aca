@@ -11,11 +11,11 @@ COPY settings.gradle .
 # Copy source code
 COPY src src
 
-# Make gradlew executable
-RUN chmod +x ./gradlew
+# Make gradlew executable and verify
+RUN chmod +x ./gradlew && ls -la ./gradlew
 
-# Build the application
-RUN ./gradlew build -x test
+# Build the application using bash explicitly
+RUN bash ./gradlew build -x test
 
 # Expose port
 EXPOSE 8080
