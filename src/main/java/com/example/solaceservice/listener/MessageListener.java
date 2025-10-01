@@ -1,6 +1,7 @@
 package com.example.solaceservice.listener;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +11,7 @@ import jakarta.jms.TextMessage;
 
 @Component
 @Slf4j
+@ConditionalOnProperty(name = "spring.jms.solace.enabled", havingValue = "true", matchIfMissing = false)
 public class MessageListener {
 
     @JmsListener(destination = "${solace.queue.name}")
