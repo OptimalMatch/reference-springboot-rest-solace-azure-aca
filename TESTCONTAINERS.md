@@ -1,140 +1,189 @@
-# TestContainers Integration Tests
+# TestContainers Integration
 
-This project includes comprehensive TestContainers-based integration tests for Solace and Azure Storage functionality.
+This project includes comprehensive TestContainers-based integration tests for both Solace messaging and Azure Storage functionality.
 
-## Test Coverage
+## Overview
 
-The `SolaceAzureIntegrationTest` class provides:
+TestContainers is a powerful framework that provides lightweight, disposable instances of common databases, message brokers, web browsers, or anything else that can run in a Docker container for integration testing.
 
-- **Container Startup**: Verifies both Solace and Azurite containers start correctly
-- **End-to-End Messaging**: Tests message sending from API to Solace broker with Azure Storage persistence
-- **Storage Operations**: Tests message retrieval, listing, and deletion from Azure Blob Storage
-- **Message Republishing**: Tests republishing stored messages back to Solace
-- **Error Handling**: Tests graceful handling of non-existent messages
-- **Resilience**: Tests system behavior under failure conditions
+## Test Files
 
-## Requirements
+### 1. `SolaceAzureIntegrationTest.java`
+**Location**: `src/test/java/com/example/solaceservice/integration/SolaceAzureIntegrationTest.java`
 
-### Docker Runtime
-TestContainers requires a Docker-compatible runtime to function:
+Comprehensive integration tests that:
+- Start Solace PubSub+ broker container
+- Start Azurite (Azure Storage emulator) container
+- Test end-to-end message flow from API → Solace → Azure Storage
+- Verify message retrieval, listing, republishing, and deletion
+- Include proper async testing with Awaitility
 
-- **Local Development**: Docker Desktop or Docker Engine
-- **CI/CD Pipelines**: Docker-enabled runners (GitHub Actions, GitLab CI, Jenkins with Docker)
-- **Cloud Environments**: Container-enabled compute instances
+**Test Coverage**:
+- Container startup and configuration
+- Message sending to Solace and storage in Azure
+- Message retrieval from Azure Storage
+- Message listing functionality
+- Message republishing to Solace
+- Message deletion from Azure Storage
+- Error handling for non-existent messages
+- Application resilience testing
 
-### Java Dependencies
+### 2. `TestContainersConfigurationTest.java`
+**Location**: `src/test/java/com/example/solaceservice/integration/TestContainersConfigurationTest.java`
+
+Simple validation tests that:
+- Verify TestContainers dependencies are available
+- Validate framework configuration without requiring Docker
+- Confirm Awaitility framework is properly set up
+
+## Dependencies
+
+The following dependencies are configured in `build.gradle`:
+
 ```gradle
 testImplementation 'org.testcontainers:junit-jupiter'
 testImplementation 'org.awaitility:awaitility:4.2.0'
+
+dependencyManagement {
+    imports {
+        mavenBom "org.testcontainers:testcontainers-bom:1.19.3"
+    }
+}
 ```
 
-## Running the Tests
+## Docker Requirements
 
-### Local Development with Docker
+**IMPORTANT**: TestContainers requires a Docker daemon to be running for container-based tests to execute.
+
+### Environment Support
+
+| Environment | Support Level | Notes |
+|-------------|---------------|-------|
+| **Local Development** | ✅ Full Support | Requires Docker Desktop or Docker daemon |
+| **CI/CD Pipelines** | ✅ Full Support | Most CI systems support Docker-in-Docker |
+| **GitHub Actions** | ✅ Full Support | Built-in Docker support |
+| **Jenkins** | ✅ Full Support | With Docker plugin |
+| **GitLab CI** | ✅ Full Support | Docker-in-Docker service |
+| **Containerized Environments** | ⚠️ Limited | Requires privileged mode or Docker socket mounting |
+
+### Running Tests
+
+#### With Docker Available
 ```bash
-# Ensure Docker is running
-docker --version
+# Run all integration tests
+./gradlew test
 
-# Run the integration tests
+# Run only TestContainers tests
+./gradlew test --tests "*Integration*"
+
+# Run specific test class
 ./gradlew test --tests SolaceAzureIntegrationTest
 ```
 
-### CI/CD Pipeline Example (GitHub Actions)
-```yaml
-name: Integration Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:dind
-        options: --privileged
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-      - name: Run Integration Tests
-        run: ./gradlew test --tests SolaceAzureIntegrationTest
+#### Without Docker
+```bash
+# Run framework validation only
+./gradlew test --tests TestContainersConfigurationTest
 ```
 
-### CI/CD Pipeline Example (GitLab CI)
-```yaml
-test:
-  stage: test
-  image: gradle:8.5-jdk17
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-  script:
-    - ./gradlew test --tests SolaceAzureIntegrationTest
-```
+## Container Configuration
 
-## Test Containers Used
-
-### Solace PubSub+ Broker
+### Solace Container
 - **Image**: `solace/solace-pubsub-standard:latest`
 - **Ports**: 55555 (SMF), 8080 (Admin)
-- **Configuration**: Default credentials and VPN
+- **Environment**: Default credentials configured
+- **Wait Strategy**: TCP port listening
 
-### Azurite (Azure Storage Emulator)
+### Azurite Container
 - **Image**: `mcr.microsoft.com/azure-storage/azurite:latest`
 - **Ports**: 10000 (Blob), 10001 (Queue), 10002 (Table)
-- **Configuration**: Default development account
+- **Configuration**: In-memory storage with default connection string
+- **Wait Strategy**: TCP port listening
 
-## Environment Limitations
+## Dynamic Configuration
 
-### Restricted Environments
-In environments without Docker access (such as some sandboxed containers), the tests will:
-- ✅ **Compile successfully** - All dependencies and code are valid
-- ❌ **Skip at runtime** - TestContainers will detect missing Docker and fail gracefully
-- 📝 **Provide clear error messages** - Indicating Docker requirement
+Tests use Spring's `@DynamicPropertySource` to configure the application based on actual container endpoints:
 
-### Alternative Testing Approaches
-For environments without Docker:
-1. **Unit Tests**: Test individual components with mocked dependencies
-2. **Manual Testing**: Use `docker-compose.yml` for manual integration testing
-3. **External Test Environment**: Run integration tests in Docker-enabled CI/CD
+```java
+@DynamicPropertySource
+static void configureProperties(DynamicPropertyRegistry registry) {
+    // Solace configuration
+    registry.add("spring.jms.solace.enabled", () -> "true");
+    registry.add("spring.jms.solace.host", () ->
+        "tcp://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(55555));
+
+    // Azure Storage configuration
+    registry.add("azure.storage.enabled", () -> "true");
+    registry.add("azure.storage.connection-string", () ->
+        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;...");
+}
+```
+
+## Benefits
+
+1. **Realistic Testing**: Tests run against real Solace and Azure Storage services
+2. **Isolation**: Each test run gets fresh containers with clean state
+3. **CI/CD Ready**: Tests can run in any Docker-enabled CI environment
+4. **No External Dependencies**: No need for external test infrastructure
+5. **Version Control**: Container versions are pinned for consistent testing
 
 ## Troubleshooting
 
 ### Common Issues
 
 #### "Could not find a valid Docker environment"
-```
-Caused by: java.lang.IllegalStateException: Could not find a valid Docker environment
-```
-**Solution**: Ensure Docker daemon is running and accessible
+**Solution**: Ensure Docker daemon is running and accessible.
 
-#### Docker Permission Issues
-```
-Got permission denied while trying to connect to the Docker daemon socket
-```
-**Solution**: Add user to docker group or run with appropriate permissions
+```bash
+# Check Docker status
+docker version
 
-#### Container Startup Timeouts
-**Solution**: Increase memory allocation or check container logs
+# Start Docker (varies by system)
+sudo systemctl start docker  # Linux
+# or
+open -a Docker              # macOS
+```
 
-### Debug Mode
-Enable TestContainers debug logging:
+#### Container startup timeouts
+**Solution**: Increase timeout or check container resource requirements.
+
+#### Port conflicts
+**Solution**: TestContainers automatically assigns random ports to avoid conflicts.
+
+### Debug Information
+
+Enable debug logging for TestContainers:
 ```java
-System.setProperty("testcontainers.logger", "DEBUG");
+// Add to test resources/application-test.yml
+logging:
+  level:
+    org.testcontainers: DEBUG
 ```
 
-## Benefits of TestContainers Approach
+## Best Practices
 
-1. **Realistic Testing**: Uses actual Solace and Azure Storage containers
-2. **Isolation**: Each test run uses fresh container instances
-3. **CI/CD Integration**: Works seamlessly in automated pipelines
-4. **No Mocking**: Tests real integration points and network communication
-5. **Reproducible**: Consistent behavior across different environments
+1. **Container Lifecycle**: Use `@Container` with static fields for class-level lifecycle
+2. **Wait Strategies**: Always specify appropriate wait strategies for containers
+3. **Resource Cleanup**: TestContainers automatically handles cleanup
+4. **Parallel Execution**: Tests can run in parallel with proper container isolation
+5. **Version Pinning**: Pin container versions for consistent test behavior
 
-## Next Steps
+## Future Enhancements
 
-1. **Local Development**: Install Docker Desktop and run tests locally
-2. **CI/CD Setup**: Configure your pipeline with Docker support
-3. **Test Expansion**: Add more test scenarios as features evolve
-4. **Performance Testing**: Consider adding load tests with TestContainers
+Potential improvements for the TestContainers setup:
+
+1. **Custom Container Images**: Build project-specific test images
+2. **Container Networking**: Use TestContainers networking for complex scenarios
+3. **Data Persistence**: Add volume mounts for test data persistence
+4. **Performance Testing**: Integration with load testing frameworks
+5. **Multi-Service Orchestration**: Compose-like container orchestration
+
+## Running in Production-like Environments
+
+For staging or production-like testing:
+
+1. Use production container images
+2. Configure realistic resource limits
+3. Test with persistent storage volumes
+4. Include network latency simulation
+5. Test failover and recovery scenarios
