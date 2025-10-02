@@ -30,3 +30,9 @@ solace:
   queue:
     name: ${SOLACE_QUEUE_NAME:test/topic}
     topic: ${SOLACE_TOPIC:test/topic}
+
+azure:
+  storage:
+    enabled: ${AZURE_STORAGE_ENABLED:false}
+    connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
+    container-name: ${AZURE_STORAGE_CONTAINER_NAME:solace-messages}

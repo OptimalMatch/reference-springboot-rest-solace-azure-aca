@@ -65,7 +65,64 @@ Test messaging:
 ```bash
 curl -X POST http://localhost:8090/api/messages \
   -H 'Content-Type: application/json' \
-  -d '{"content":"Hello Solace!","destination":"test.queue"}'
+  -d '{"content":"Hello Solace!","destination":"test/topic"}'
+```
+
+## Azure Blob Storage Integration
+
+The service includes optional Azure Blob Storage integration for message persistence and replay capabilities.
+
+### Configuration
+
+Add these environment variables to enable Azure Storage:
+
+```bash
+AZURE_STORAGE_ENABLED=true
+AZURE_STORAGE_CONNECTION_STRING="your-azure-storage-connection-string"
+AZURE_STORAGE_CONTAINER_NAME=solace-messages  # optional, defaults to 'solace-messages'
+```
+
+### Features
+
+When Azure Storage is enabled:
+
+1. **Automatic Storage**: All sent messages are automatically stored as JSON files in Azure Blob Storage
+2. **Message Retrieval**: Retrieve previously sent messages by ID
+3. **Message Republishing**: Republish stored messages to Solace queues with new message IDs
+4. **Message Management**: List, view, and delete stored messages
+
+### API Endpoints
+
+```bash
+# Check storage status
+GET /api/storage/status
+
+# List stored messages (limit optional, default 50)
+GET /api/storage/messages?limit=10
+
+# Get specific stored message
+GET /api/storage/messages/{messageId}
+
+# Republish a stored message (creates new message ID)
+POST /api/storage/messages/{messageId}/republish
+
+# Delete a stored message
+DELETE /api/storage/messages/{messageId}
+```
+
+### Example Usage
+
+```bash
+# Send a message (automatically stored if Azure Storage enabled)
+curl -X POST http://localhost:8090/api/messages \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"Important message","destination":"prod/orders"}'
+
+# List stored messages
+curl http://localhost:8090/api/storage/messages
+
+# Republish a message
+curl -X POST http://localhost:8090/api/storage/messages/{messageId}/republish
 ```
 
 ## Testing

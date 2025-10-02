@@ -28,6 +28,8 @@ dependencies {
     implementation 'org.springframework:spring-jms'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'jakarta.jms:jakarta.jms-api:3.1.0'
+    implementation 'com.azure:azure-storage-blob:12.24.0'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
