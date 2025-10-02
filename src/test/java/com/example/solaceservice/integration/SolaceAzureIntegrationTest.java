@@ -19,7 +19,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.SolaceContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -37,10 +36,11 @@ import static java.time.Duration.ofSeconds;
 class SolaceAzureIntegrationTest {
 
     @Container
-    static SolaceContainer solaceContainer = new SolaceContainer("solace/solace-pubsub-standard:latest")
-            .withVpn("test_vpn")
-            .withCredentials("test_user", "test_password")
-            .withTopic("test/topic", SolaceContainer.Service.SMF);
+    static GenericContainer<?> solaceContainer = new GenericContainer<>("solace/solace-pubsub-standard:latest")
+            .withExposedPorts(55555, 8080)
+            .withEnv("username_admin_globalaccesslevel", "admin")
+            .withEnv("username_admin_password", "admin")
+            .waitingFor(Wait.forListeningPort());
 
     @Container
     static GenericContainer<?> azuriteContainer = new GenericContainer<>("mcr.microsoft.com/azure-storage/azurite:latest")
@@ -62,10 +62,11 @@ class SolaceAzureIntegrationTest {
     static void configureProperties(DynamicPropertyRegistry registry) {
         // Solace configuration
         registry.add("spring.jms.solace.enabled", () -> "true");
-        registry.add("spring.jms.solace.host", () -> solaceContainer.getOrigin(SolaceContainer.Service.SMF));
-        registry.add("spring.jms.solace.username", () -> "test_user");
-        registry.add("spring.jms.solace.password", () -> "test_password");
-        registry.add("spring.jms.solace.vpn-name", () -> "test_vpn");
+        registry.add("spring.jms.solace.host", () ->
+            "tcp://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(55555));
+        registry.add("spring.jms.solace.username", () -> "default");
+        registry.add("spring.jms.solace.password", () -> "default");
+        registry.add("spring.jms.solace.vpn-name", () -> "default");
 
         // Azure Storage configuration
         registry.add("azure.storage.enabled", () -> "true");

@@ -36,10 +36,7 @@ dependencies {
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.testcontainers:solace'
-    testImplementation 'org.testcontainers:azurite'
     testImplementation 'org.awaitility:awaitility:4.2.0'
-    testImplementation 'com.azure:azure-storage-blob:12.24.0'
 }
 
 dependencyManagement {
