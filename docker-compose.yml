@@ -1,4 +1,21 @@
 services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: azurite-emulator
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
+    volumes:
+      - azurite-data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --debug /data/debug.log
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   solace-broker:
     image: solace/solace-pubsub-standard:latest
     container_name: solace-broker
@@ -40,8 +57,13 @@ services:
       - SOLACE_VPN=default
       - SOLACE_QUEUE_NAME=test/topic
       - SOLACE_TOPIC=test/topic
+      - AZURE_STORAGE_ENABLED=true
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - AZURE_STORAGE_CONTAINER_NAME=solace-messages
     depends_on:
       solace-broker:
+        condition: service_healthy
+      azurite:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
@@ -50,3 +72,5 @@ services:
       retries: 5
       start_period: 30s
 
+volumes:
+  azurite-data:
