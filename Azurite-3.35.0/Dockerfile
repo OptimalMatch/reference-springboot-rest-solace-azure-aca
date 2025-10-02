@@ -8,6 +8,9 @@ WORKDIR /opt/azurite
 # Install dependencies first
 COPY *.json LICENSE NOTICE.txt ./
 
+# Install build dependencies for native modules (like keytar)
+RUN apk add --no-cache python3 make g++
+
 # Copy the source code and build the app
 COPY src ./src
 COPY tests ./tests
@@ -30,6 +33,9 @@ VOLUME [ "/data" ]
 COPY package*.json LICENSE NOTICE.txt ./
 
 COPY --from=builder /opt/azurite/dist/ dist/
+
+# Install build dependencies for native modules (like keytar)
+RUN apk add --no-cache python3 make g++
 
 RUN npm pkg set scripts.prepare="echo no-prepare"
 
