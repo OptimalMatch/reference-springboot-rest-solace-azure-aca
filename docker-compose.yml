@@ -1,6 +1,10 @@
 services:
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
+    build:
+      context: ./Azurite-3.35.0
+      dockerfile: Dockerfile
+    image: azurite:latest
+    #image: mcr.microsoft.com/azure-storage/azurite:latest
     container_name: azurite-emulator
     ports:
       - "10000:10000"  # Blob service

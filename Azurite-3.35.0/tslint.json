@@ -1,0 +1,21 @@
+{
+  "defaultSeverity": "error",
+  "extends": ["tslint:recommended"],
+  "jsRules": {},
+  "rules": {
+    "trailing-comma": false,
+    "arrow-parens": false,
+    "variable-name": false,
+    "object-literal-sort-keys": false,
+    "object-literal-key-quotes": false,
+    "array-type": false
+  },
+  "rulesDirectory": [],
+  "linterOptions": {
+    "exclude": [
+      "src/blob/generated/**/*",
+      "src/table/generated/**/*",
+      "src/queue/generated/**/*"
+    ]
+  }
+}
