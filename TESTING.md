@@ -1,5 +1,17 @@
 # Testing Azure Storage Integration
 
+## TestContainers Integration Tests
+
+For automated integration testing with realistic containers, see **[TESTCONTAINERS.md](TESTCONTAINERS.md)**.
+
+These tests provide comprehensive coverage including:
+- Solace + Azurite containers in isolated environments
+- End-to-end message flow validation
+- CI/CD pipeline integration
+- **Requires Docker runtime to execute**
+
+## Manual Testing Options
+
 ## Option 1: Full Local Testing with Azurite (Recommended)
 
 ### Quick Start
