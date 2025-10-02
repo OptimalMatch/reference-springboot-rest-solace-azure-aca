@@ -31,6 +31,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static java.time.Duration.ofSeconds;
 
+/**
+ * Comprehensive integration tests for Solace and Azure Storage using TestContainers.
+ * These tests verify the end-to-end functionality of message sending, storage, and retrieval.
+ *
+ * REQUIREMENTS: Docker daemon must be running for these tests to execute.
+ * Tests will be skipped if Docker is not available.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 class SolaceAzureIntegrationTest {
