@@ -47,6 +47,7 @@ class SolaceAzureIntegrationTest {
             .withExposedPorts(55555, 8080)
             .withEnv("username_admin_globalaccesslevel", "admin")
             .withEnv("username_admin_password", "admin")
+            .withSharedMemorySize(2_000_000_000L) // 2GB shared memory for Solace container
             .waitingFor(Wait.forListeningPort());
 
     @Container

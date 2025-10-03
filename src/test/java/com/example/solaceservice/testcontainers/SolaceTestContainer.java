@@ -16,6 +16,7 @@ public class SolaceTestContainer extends GenericContainer<SolaceTestContainer> {
                 .withEnv("username_admin_globalaccesslevel", "admin")
                 .withEnv("username_admin_password", "admin")
                 .withEnv("system_scaling_maxconnectioncount", "100")
+                .withSharedMemorySize(2_000_000_000L) // 2GB shared memory for Solace container
                 .waitingFor(Wait.forLogMessage(".*Solace PubSub\\+ Standard.*", 1));
     }
 
