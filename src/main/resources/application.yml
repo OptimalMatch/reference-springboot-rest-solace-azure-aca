@@ -8,6 +8,11 @@ spring:
       username: ${SOLACE_USERNAME:default}
       password: ${SOLACE_PASSWORD:default}
       vpn-name: ${SOLACE_VPN:default}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
 
 server:
   port: 8080

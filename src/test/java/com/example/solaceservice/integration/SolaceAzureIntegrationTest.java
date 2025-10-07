@@ -47,14 +47,24 @@ class SolaceAzureIntegrationTest {
             .withExposedPorts(55555, 8080)
             .withEnv("username_admin_globalaccesslevel", "admin")
             .withEnv("username_admin_password", "admin")
+            .withEnv("system_scaling_maxconnectioncount", "100")
             .withSharedMemorySize(2_000_000_000L) // 2GB shared memory for Solace container
-            .waitingFor(Wait.forListeningPort());
+            .withCreateContainerCmdModifier(cmd -> {
+                cmd.getHostConfig()
+                        .withUlimits(new com.github.dockerjava.api.model.Ulimit[] {
+                                new com.github.dockerjava.api.model.Ulimit("core", -1L, -1L),
+                                new com.github.dockerjava.api.model.Ulimit("nofile", 65536L, 1048576L)
+                        });
+            })
+            .waitingFor(Wait.forHttp("/").forPort(8080).forStatusCode(200)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(120)));
 
     @Container
     static GenericContainer<?> azuriteContainer = new GenericContainer<>("mcr.microsoft.com/azure-storage/azurite:latest")
             .withExposedPorts(10000, 10001, 10002)
             .withCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data")
-            .waitingFor(Wait.forListeningPort());
+            .waitingFor(Wait.forListeningPort()
+                    .withStartupTimeout(java.time.Duration.ofSeconds(30)));
 
     @LocalServerPort
     private int port;

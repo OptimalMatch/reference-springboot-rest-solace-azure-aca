@@ -32,7 +32,7 @@ class MessageControllerIntegrationTest extends AbstractSolaceIntegrationTest {
         request.setDestination("test.queue");
         request.setCorrelationId("test-correlation-id");
 
-        String url = "http://localhost:" + port + "/api/messages/send";
+        String url = "http://localhost:" + port + "/api/messages";
 
         // When
         ResponseEntity<MessageResponse> response = restTemplate.postForEntity(
@@ -52,7 +52,7 @@ class MessageControllerIntegrationTest extends AbstractSolaceIntegrationTest {
         MessageRequest request = new MessageRequest();
         // Missing content - should cause validation error
 
-        String url = "http://localhost:" + port + "/api/messages/send";
+        String url = "http://localhost:" + port + "/api/messages";
 
         // When
         ResponseEntity<String> response = restTemplate.postForEntity(

@@ -1,12 +1,6 @@
 spring:
   application:
     name: solace-service-test
-  jms:
-    solace:
-      host: tcp://localhost:55555
-      username: admin
-      password: admin
-      vpn-name: default
 
 solace:
   queue:
