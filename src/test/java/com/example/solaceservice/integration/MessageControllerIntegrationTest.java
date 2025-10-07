@@ -1,19 +1,22 @@
 package com.example.solaceservice.integration;
 
-import com.example.solaceservice.AbstractSolaceIntegrationTest;
 import com.example.solaceservice.model.MessageRequest;
 import com.example.solaceservice.model.MessageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MessageControllerIntegrationTest extends AbstractSolaceIntegrationTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+class MessageControllerIntegrationTest {
 
     @LocalServerPort
     private int port;

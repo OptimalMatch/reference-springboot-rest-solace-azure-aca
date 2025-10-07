@@ -19,6 +19,7 @@ public abstract class AbstractSolaceIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.jms.solace.enabled", () -> "true");
         registry.add("spring.jms.solace.host", solaceContainer::getSolaceHost);
         registry.add("spring.jms.solace.username", () -> "admin");
         registry.add("spring.jms.solace.password", () -> "admin");
