@@ -27,7 +27,10 @@ public class SolaceTestContainer extends GenericContainer<SolaceTestContainer> {
                             });
                 })
                 .withStartupTimeout(Duration.ofSeconds(120))
+                // Wait for both HTTP admin and messaging ports to be ready
                 .waitingFor(Wait.forHttp("/").forPort(SOLACE_SEMP_PORT).forStatusCode(200)
+                        .withStartupTimeout(Duration.ofSeconds(120)))
+                .waitingFor(Wait.forListeningPorts(SOLACE_PORT)
                         .withStartupTimeout(Duration.ofSeconds(120)));
     }
 

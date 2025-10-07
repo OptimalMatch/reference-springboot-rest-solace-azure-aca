@@ -4,27 +4,35 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.example.solaceservice.listener.MessageListener;
 import com.example.solaceservice.model.MessageRequest;
 import com.example.solaceservice.model.MessageResponse;
 import com.example.solaceservice.model.StoredMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.client.RestTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.ByteArrayOutputStream;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,6 +66,8 @@ class SolaceAzureIntegrationTest {
                         });
             })
             .waitingFor(Wait.forHttp("/").forPort(8080).forStatusCode(200)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(120)))
+            .waitingFor(Wait.forListeningPorts(55555)
                     .withStartupTimeout(java.time.Duration.ofSeconds(120)));
 
     @Container
@@ -73,7 +83,13 @@ class SolaceAzureIntegrationTest {
     @Autowired
     private TestRestTemplate restTemplate;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Mock the MessageListener so it doesn't consume messages during tests
+    @MockBean
+    private MessageListener messageListener;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private String baseUrl;
     private BlobServiceClient blobServiceClient;
 
@@ -95,6 +111,77 @@ class SolaceAzureIntegrationTest {
         registry.add("azure.storage.container-name", () -> "test-messages");
     }
 
+    @BeforeAll
+    static void setUpQueues() {
+        System.out.println("Solace container started at: tcp://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(55555));
+
+        // Wait a bit for Solace messaging to fully initialize
+        try {
+            Thread.sleep(3000);  // Wait 3 seconds for messaging to be ready
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Enable message spool first (required for queues)
+        enableMessageSpool();
+
+        // Create all queues needed for the tests
+        createQueue("test/integration");
+        createQueue("test/retrieve");
+        createQueue("test/list");
+        createQueue("test/republish");
+        createQueue("test/delete");
+        createQueue("test/resilience");
+        createQueue("test/topic");  // Default queue
+    }
+
+    /**
+     * Enables message spool for the default VPN (required for creating queues)
+     */
+    private static void enableMessageSpool() {
+        String sempUrl = "http://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(8080) +
+                        "/SEMP/v2/config/msgVpns/default";
+
+        // Create RestTemplate with HttpClient5 to support PATCH
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
+        requestFactory.setHttpClient(HttpClients.createDefault());
+        RestTemplate restTemplate = new RestTemplate(requestFactory);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Add Basic Authentication
+        String auth = "admin:admin";
+        byte[] encodedAuth = Base64.getEncoder().encode(auth.getBytes());
+        String authHeader = "Basic " + new String(encodedAuth);
+        headers.set("Authorization", authHeader);
+
+        // Enable message spool
+        Map<String, Object> vpnConfig = new HashMap<>();
+        vpnConfig.put("enabled", true);
+        vpnConfig.put("maxMsgSpoolUsage", 1500);  // 1.5GB spool space
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(vpnConfig, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                sempUrl,
+                HttpMethod.PATCH,
+                request,
+                String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                System.out.println("Successfully enabled message spool for VPN: default");
+            } else {
+                System.err.println("Failed to enable message spool: " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            // May already be enabled
+            System.out.println("Message spool configuration note: " + e.getMessage());
+        }
+    }
+
     @BeforeEach
     void setUp() {
         baseUrl = "http://localhost:" + port;
@@ -108,6 +195,54 @@ class SolaceAzureIntegrationTest {
         blobServiceClient = new BlobServiceClientBuilder()
             .connectionString(connectionString)
             .buildClient();
+    }
+
+    /**
+     * Creates a queue in the Solace broker using SEMP API
+     * @param queueName the name of the queue to create
+     */
+    private static void createQueue(String queueName) {
+        String sempUrl = "http://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(8080) +
+                        "/SEMP/v2/config/msgVpns/default/queues";
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Add Basic Authentication
+        String auth = "admin:admin";
+        byte[] encodedAuth = Base64.getEncoder().encode(auth.getBytes());
+        String authHeader = "Basic " + new String(encodedAuth);
+        headers.set("Authorization", authHeader);
+
+        // Create queue configuration
+        Map<String, Object> queueConfig = new HashMap<>();
+        queueConfig.put("queueName", queueName);
+        queueConfig.put("accessType", "exclusive");
+        queueConfig.put("maxMsgSpoolUsage", 200);
+        queueConfig.put("permission", "delete");
+        queueConfig.put("ingressEnabled", true);
+        queueConfig.put("egressEnabled", true);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(queueConfig, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                sempUrl,
+                HttpMethod.POST,
+                request,
+                String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                System.out.println("Successfully created queue: " + queueName);
+            } else {
+                System.err.println("Failed to create queue: " + queueName + ", Status: " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            // Queue might already exist, which is fine
+            System.out.println("Queue creation note for " + queueName + ": " + e.getMessage());
+        }
     }
 
     @Test
@@ -125,7 +260,6 @@ class SolaceAzureIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues and Azure storage")
     void shouldSendMessageToSolaceAndStoreInAzure() throws Exception {
         // Given
         MessageRequest request = new MessageRequest();
@@ -172,7 +306,6 @@ class SolaceAzureIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues and Azure storage")
     void shouldRetrieveStoredMessage() throws Exception {
         // Given - send a message first
         MessageRequest request = new MessageRequest();
@@ -204,7 +337,6 @@ class SolaceAzureIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues and Azure storage")
     void shouldListStoredMessages() throws Exception {
         // Given - send multiple messages
         for (int i = 1; i <= 3; i++) {
@@ -237,7 +369,6 @@ class SolaceAzureIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues and Azure storage")
     void shouldRepublishStoredMessage() throws Exception {
         // Given - send a message first
         MessageRequest request = new MessageRequest();
@@ -277,7 +408,6 @@ class SolaceAzureIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues and Azure storage")
     void shouldDeleteStoredMessage() throws Exception {
         // Given - send a message first
         MessageRequest request = new MessageRequest();

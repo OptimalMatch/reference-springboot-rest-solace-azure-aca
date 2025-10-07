@@ -1,13 +1,15 @@
 package com.example.solaceservice.integration;
 
 import com.example.solaceservice.AbstractSolaceIntegrationTest;
+import com.example.solaceservice.listener.MessageListener;
 import com.example.solaceservice.model.MessageRequest;
 import com.example.solaceservice.service.MessageService;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jms.core.JmsTemplate;
 
 import jakarta.jms.JMSException;
@@ -26,11 +28,24 @@ class MessageServiceIntegrationTest extends AbstractSolaceIntegrationTest {
     @Autowired
     private JmsTemplate jmsTemplate;
 
+    // Mock the MessageListener so it doesn't consume messages during tests
+    @MockBean
+    private MessageListener messageListener;
+
     @Value("${solace.queue.name}")
     private String testQueue;
 
+    @BeforeAll
+    static void setUpQueues() {
+        // Call parent setUp first
+        AbstractSolaceIntegrationTest.setUp();
+
+        // Create the queues needed for the tests
+        createQueue("test.queue");  // Default queue from application-test.yml
+        createQueue("custom.test.queue");  // Custom queue for specific test
+    }
+
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues")
     void shouldSendAndReceiveMessage() throws JMSException {
         // Given
         MessageRequest request = new MessageRequest();
@@ -65,7 +80,6 @@ class MessageServiceIntegrationTest extends AbstractSolaceIntegrationTest {
     }
 
     @Test
-    @Disabled("Requires Solace broker with pre-configured queues")
     void shouldSendMessageToSpecificDestination() throws JMSException {
         // Given
         String customQueue = "custom.test.queue";
