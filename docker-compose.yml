@@ -14,22 +14,31 @@ services:
       - azurite-data:/data
     command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --debug /data/debug.log
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      test: ["CMD-SHELL", "code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:10000/ || echo 000) && [ \"$code\" != \"000\" ]"]
+      #test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:10000/ | grep -qE '2..|3..|4..|5..'"]
+      #test: ["CMD", "curl", "-f", "http://localhost:10000/ || exit 1"]
+      #test: ["CMD", "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:10000/devstoreaccount1?comp=list"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    #healthcheck:
+      #test: ["CMD", "nc", "-z", "localhost", "10000"]
+      #interval: 30s
+      #timeout: 10s
+      #retries: 3
+      #start_period: 10s
 
   solace-broker:
     image: solace/solace-pubsub-standard:latest
     container_name: solace-broker
     hostname: solace-broker
     ports:
-      - "8080:8080"   # Web admin console
+      - "8095:8080"   # Web admin console
       - "55555:55555" # SMF port
       - "8008:8008"   # Web messaging
       - "1943:1943"   # MQTT port
-      - "8443:8443"   # Web admin HTTPS
+      - "8445:8443"   # Web admin HTTPS
       - "9443:9443"   # REST messaging HTTPS
     environment:
       - username_admin_globalaccesslevel=admin
@@ -52,7 +61,7 @@ services:
     build: .
     container_name: solace-service-app
     ports:
-      - "8090:8080"  # App on different port to avoid conflict with Solace admin
+      - "8091:8080"  # App on different port to avoid conflict with Solace admin
     environment:
       - SOLACE_ENABLED=true
       - SOLACE_HOST=tcp://solace-broker:55555
