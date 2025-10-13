@@ -57,6 +57,24 @@ services:
       retries: 5
       start_period: 90s
 
+  solace-init:
+    image: curlimages/curl:latest
+    container_name: solace-init
+    volumes:
+      - ./init-solace-queue.sh:/init-solace-queue.sh:ro
+    entrypoint: ["/bin/sh", "/init-solace-queue.sh"]
+    environment:
+      - SOLACE_HOST=solace-broker
+      - SOLACE_PORT=8080
+      - SOLACE_USER=admin
+      - SOLACE_PASS=admin
+      - VPN_NAME=default
+      - QUEUE_NAME=test/topic
+      - TOPIC_NAME=test/topic
+    depends_on:
+      solace-broker:
+        condition: service_healthy
+
   solace-service:
     build: .
     container_name: solace-service-app
@@ -78,8 +96,10 @@ services:
         condition: service_healthy
       azurite:
         condition: service_healthy
+      solace-init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "bash", "-c", "timeout 3 bash -c '</dev/tcp/localhost/8080'"]
       interval: 30s
       timeout: 10s
       retries: 5
