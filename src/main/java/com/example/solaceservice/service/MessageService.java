@@ -8,12 +8,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.core.MessageCreator;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;
 import jakarta.jms.Session;
 import jakarta.jms.TextMessage;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -68,8 +70,15 @@ public class MessageService {
             }
         }
 
-        // Store message to Azure if storage service is available
+        // Store message to Azure asynchronously (fire-and-forget)
         if (azureStorageService != null) {
+            storeMessageAsync(request, messageId, status);
+        }
+    }
+
+    @Async("messageTaskExecutor")
+    public CompletableFuture<Void> storeMessageAsync(MessageRequest request, String messageId, String status) {
+        return CompletableFuture.runAsync(() -> {
             try {
                 StoredMessage storedMessage = StoredMessage.fromRequest(request, messageId, status);
                 azureStorageService.storeMessage(storedMessage);
@@ -78,6 +87,6 @@ public class MessageService {
                 log.error("Failed to store message {} to Azure Blob Storage", messageId, e);
                 // Don't fail the entire operation if storage fails
             }
-        }
+        });
     }
 }

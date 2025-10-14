@@ -16,6 +16,12 @@ spring:
 
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 200        # Maximum number of worker threads
+      min-spare: 10   # Minimum number of worker threads
+    max-connections: 10000  # Maximum number of connections
+    accept-count: 100  # Queue size for incoming connections
 
 management:
   endpoints:
