@@ -20,7 +20,7 @@ class FixedPositionIdExtractorTest {
     void shouldExtractUsingStartAndLength() {
         // Given
         String content = "HDR20251014ACCT00012345TRANS000567890USD00100000";
-        String config = "13|11";
+        String config = "11|11";  // Position 11, length 11
 
         // When
         List<String> ids = extractor.extractIds(content, config);
@@ -35,7 +35,7 @@ class FixedPositionIdExtractorTest {
     void shouldExtractUsingStartAndEnd() {
         // Given
         String content = "HDR20251014ACCT00012345TRANS000567890USD00100000";
-        String config = "13-24";
+        String config = "11-22";  // Position 11 to 22
 
         // When
         List<String> ids = extractor.extractIds(content, config);

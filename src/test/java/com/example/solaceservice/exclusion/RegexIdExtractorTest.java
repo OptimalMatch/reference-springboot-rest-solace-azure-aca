@@ -35,7 +35,7 @@ class RegexIdExtractorTest {
     void shouldExtractFixClOrdID() {
         // Given
         String fixMessage = "8=FIX.4.4|35=D|49=SENDER|56=TARGET|11=ORD12345|55=AAPL|54=1|";
-        String config = "\\|11=([^\\|]+)\\||1";
+        String config = "11=([^\\|]+)|1";
 
         // When
         List<String> ids = extractor.extractIds(fixMessage, config);

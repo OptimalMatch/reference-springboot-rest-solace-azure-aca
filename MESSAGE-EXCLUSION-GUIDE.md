@@ -76,7 +76,7 @@ curl -X POST http://localhost:8091/api/exclusions/rules \
     "name": "HL7 MSH-10 Exclusion",
     "messageType": "HL7_ADT",
     "extractorType": "DELIMITED",
-    "extractorConfig": "|MSH|10",
+    "extractorConfig": "|MSH|9",
     "excludedIdentifiers": "MSG12345,MSG67890,TEST*",
     "active": true,
     "priority": 10
@@ -93,7 +93,7 @@ curl -X POST http://localhost:8091/api/exclusions/rules \
     "name": "HL7 PID-3 Patient ID Exclusion",
     "messageType": "HL7",
     "extractorType": "DELIMITED",
-    "extractorConfig": "|PID|3",
+    "extractorConfig": "|PID|2",
     "excludedIdentifiers": "PAT123,PAT456,PAT789",
     "active": true,
     "priority": 5
@@ -164,7 +164,7 @@ curl -X POST http://localhost:8091/api/exclusions/rules \
     "name": "FIX ClOrdID (Tag 11) Exclusion",
     "messageType": "FIX",
     "extractorType": "REGEX",
-    "extractorConfig": "\\|11=([^\\|]+)\\||1",
+    "extractorConfig": "11=([^\\|]+)|1",
     "excludedIdentifiers": "ORD12345,ORD-BLOCKED-*",
     "active": true,
     "priority": 10

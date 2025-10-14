@@ -46,11 +46,13 @@ public class ExclusionRule {
     /**
      * Whether this rule is active
      */
+    @Builder.Default
     private boolean active = true;
     
     /**
      * Priority (higher number = higher priority)
      */
+    @Builder.Default
     private int priority = 0;
 }
 
