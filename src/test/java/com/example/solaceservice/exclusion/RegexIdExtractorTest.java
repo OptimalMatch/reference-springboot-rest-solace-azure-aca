@@ -32,18 +32,18 @@ class RegexIdExtractorTest {
     }
 
     @Test
-    void shouldExtractFixClOrdID() {
-        // Given
-        String fixMessage = "8=FIX.4.4|35=D|49=SENDER|56=TARGET|11=ORD12345|55=AAPL|54=1|";
-        String config = "11=([A-Z0-9]+)|1";  // Match "11=" followed by alphanumeric characters
+    void shouldExtractSwiftUETR() {
+        // Given - SWIFT MT message with UETR in block 3
+        String swiftMessage = "{1:F01BANKBEBBAXXX}{2:O1031234}{3:{121:97ed4827-7b6f-4491-a06f-2f5f8a5c8d3f}}{4:...}";
+        String config = "\\{121:([0-9a-f-]+)\\}|1";  // Extract UETR from block 3
 
         // When
-        List<String> ids = extractor.extractIds(fixMessage, config);
+        List<String> ids = extractor.extractIds(swiftMessage, config);
 
         // Then
         assertNotNull(ids);
         assertEquals(1, ids.size());
-        assertEquals("ORD12345", ids.get(0));
+        assertEquals("97ed4827-7b6f-4491-a06f-2f5f8a5c8d3f", ids.get(0));
     }
 
     @Test

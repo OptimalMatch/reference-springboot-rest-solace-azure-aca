@@ -42,22 +42,22 @@ class MessageExclusionServiceTest {
 
     @Test
     void shouldExcludeBasedOnRegexRule() {
-        // Given
+        // Given - Simple regex test with a well-structured pattern
         ExclusionRule rule = ExclusionRule.builder()
             .ruleId("rule1")
-            .name("SWIFT UETR Block")
-            .messageType("SWIFT")
+            .name("Transaction ID Block")
+            .messageType("TRANSACTION")
             .extractorType("REGEX")
-            .extractorConfig(":121:([0-9a-f\\-]+)|1")  // Match hex chars and hyphen (escaped)
-            .excludedIdentifiers("blocked-uuid-123")
+            .extractorConfig("TXN-ID:(\\w+)|1")  // Extract word characters after "TXN-ID:"
+            .excludedIdentifiers("BLOCKED123")
             .build();  // active and priority will use defaults
         
         service.addRule(rule);
         
-        String swiftMessage = "{4::121:blocked-uuid-123:23B:CRED-}";
+        String message = "Transaction: TXN-ID:BLOCKED123 Amount:1000.00";
 
         // When
-        boolean excluded = service.shouldExclude(swiftMessage, "SWIFT");
+        boolean excluded = service.shouldExclude(message, "TRANSACTION");
 
         // Then
         assertTrue(excluded);

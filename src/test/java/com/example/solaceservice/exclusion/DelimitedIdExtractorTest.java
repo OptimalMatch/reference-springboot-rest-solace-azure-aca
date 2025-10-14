@@ -79,6 +79,26 @@ class DelimitedIdExtractorTest {
     }
 
     @Test
+    void shouldExtractFixClOrdID() {
+        // Given - FIX protocol message (pipe-delimited)
+        String fixMessage = "8=FIX.4.4|9=100|35=D|49=SENDER|56=TARGET|34=1|52=20251014|11=ORD12345|55=AAPL|54=1|";
+        // FIX tag 11 (ClOrdID) is at various positions, need to parse properly
+        // Split by | and find the field starting with "11="
+        String config = "|4";  // Simple approach: field at index 4 is "11=ORD12345"
+        
+        // Actually, let's count: 0=8=FIX.4.4, 1=9=100, 2=35=D, 3=49=SENDER, 4=56=TARGET, 5=34=1, 6=52=20251014, 7=11=ORD12345
+        String betterConfig = "|7";  // Field index 7
+
+        // When
+        List<String> ids = extractor.extractIds(fixMessage, betterConfig);
+
+        // Then
+        assertNotNull(ids);
+        assertEquals(1, ids.size());
+        assertEquals("11=ORD12345", ids.get(0));  // Will contain the tag=value format
+    }
+
+    @Test
     void shouldReturnEmptyListWhenSegmentNotFound() {
         // Given
         String hl7Message = "MSH|^~\\&|HIS|HOSPITAL||20251014||ADT^A01|MSG12345|P|2.5";
