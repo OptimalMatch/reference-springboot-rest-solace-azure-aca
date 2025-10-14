@@ -32,10 +32,10 @@ check_status() {
 
     if [ "$actual" -eq "$expected" ]; then
         echo -e "${GREEN}✓ PASSED${NC} - HTTP Status: $actual"
-        ((TESTS_PASSED++))
+        TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}✗ FAILED${NC} - Expected: $expected, Got: $actual"
-        ((TESTS_FAILED++))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 }
 
@@ -115,10 +115,10 @@ for i in {1..3}; do
             MSG_ID=$(echo "$BODY" | python3 -c "import sys, json; print(json.load(sys.stdin)['messageId'])" 2>/dev/null || echo "")
             MESSAGE_IDS+=("$MSG_ID")
         fi
-        ((TESTS_PASSED++))
+        TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}✗${NC} Message $i failed (HTTP $HTTP_CODE)"
-        ((TESTS_FAILED++))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 done
 
@@ -247,7 +247,7 @@ try:
     print(f'  - REPUBLISHED: {republished}')
 except:
     print('Unable to parse statistics')
-" 2>/dev/null && ((TESTS_PASSED++)) || ((TESTS_FAILED++))
+" 2>/dev/null && TESTS_PASSED=$((TESTS_PASSED + 1)) || TESTS_FAILED=$((TESTS_FAILED + 1))
 else
     echo -e "${YELLOW}⚠ Skipping statistics (python3 not available)${NC}"
 fi
@@ -276,7 +276,7 @@ try:
         print(f'... and {len(msgs) - 10} more messages')
 except Exception as e:
     print(f'Unable to display messages: {e}')
-" 2>/dev/null && ((TESTS_PASSED++)) || ((TESTS_FAILED++))
+" 2>/dev/null && TESTS_PASSED=$((TESTS_PASSED + 1)) || TESTS_FAILED=$((TESTS_FAILED + 1))
 else
     echo -e "${YELLOW}⚠ Skipping message display (python3 not available)${NC}"
 fi
