@@ -57,12 +57,12 @@ get_template() {
     case $template_index in
         0) echo 'SWIFT MT103: {1:F01BANKUS33AXXX}{2:I103BANKDE55XXXXN}{4::20:FT{{ID}}:23B:CRED:32A:251013USD100000,00-}' ;;
         1) echo 'SWIFT MT202: {1:F01CHASUS33AXXX}{2:I202CITIUS33XXXXN}{4::20:TRN{{ID}}:32A:251013USD5000000,00-}' ;;
-        2) echo 'HL7 ADT: MSH|^~\&|HIS|HOSPITAL||{{TIMESTAMP}}||ADT^A01|MSG{{ID}}|P|2.5\rPID|1||{{ID}}^^^MR||DOE^JOHN||19800115|M' ;;
-        3) echo 'HL7 ORU: MSH|^~\&|LAB|LABCORP||{{TIMESTAMP}}||ORU^R01|MSG{{ID}}|P|2.5\rOBR|1|ORD{{ID}}||CBC^COMPLETE BLOOD COUNT' ;;
-        4) echo 'ISO20022: <?xml version="1.0"?><Document><CstmrCdtTrfInitn><GrpHdr><MsgId>MSG{{ID}}</MsgId></GrpHdr></CstmrCdtTrfInitn></Document>' ;;
-        5) echo 'Order: {"orderId":"ORD{{ID}}","customer":"CUST{{ID}}","items":[{"sku":"PROD001","qty":5,"price":99.99}],"total":499.95}' ;;
+        2) echo 'HL7 ADT: MSH|^~\\&|HIS|HOSPITAL||{{TIMESTAMP}}||ADT^A01|MSG{{ID}}|P|2.5\\rPID|1||{{ID}}^^^MR||DOE^JOHN||19800115|M' ;;
+        3) echo 'HL7 ORU: MSH|^~\\&|LAB|LABCORP||{{TIMESTAMP}}||ORU^R01|MSG{{ID}}|P|2.5\\rOBR|1|ORD{{ID}}||CBC^COMPLETE BLOOD COUNT' ;;
+        4) echo 'ISO20022: <?xml version=\"1.0\"?><Document><CstmrCdtTrfInitn><GrpHdr><MsgId>MSG{{ID}}</MsgId></GrpHdr></CstmrCdtTrfInitn></Document>' ;;
+        5) echo 'Order: {\"orderId\":\"ORD{{ID}}\",\"customer\":\"CUST{{ID}}\",\"items\":[{\"sku\":\"PROD001\",\"qty\":5,\"price\":99.99}],\"total\":499.95}' ;;
         6) echo 'FIX: 8=FIX.4.4|35=D|49=SENDER|56=TARGET|34={{ID}}|11=ORD{{ID}}|55=AAPL|54=1|38=100|40=2|44=150.50' ;;
-        7) echo 'Trade: {"tradeId":"TRD{{ID}}","instrument":"USD/EUR","quantity":1000000,"price":1.0842,"side":"BUY"}' ;;
+        7) echo 'Trade: {\"tradeId\":\"TRD{{ID}}\",\"instrument\":\"USD/EUR\",\"quantity\":1000000,\"price\":1.0842,\"side\":\"BUY\"}' ;;
     esac
 }
 
