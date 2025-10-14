@@ -37,7 +37,7 @@ class DelimitedIdExtractorTest {
         // Given
         String hl7Message = "MSH|^~\\&|HIS|HOSPITAL||20251014||ADT^A01|MSG12345|P|2.5\r" +
                            "PID|1||PAT123^^^HOSPITAL^MR||DOE^JOHN^A||19800115|M";
-        String config = "|PID|2";  // Field index 2 (0-based: segment name is position 0)
+        String config = "|PID|3";  // Field index 3 (0-based: PID=0, 1=1, empty=2, PAT123=3)
 
         // When
         List<String> ids = extractor.extractIds(hl7Message, config);

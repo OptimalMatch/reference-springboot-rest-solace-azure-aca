@@ -48,7 +48,7 @@ class MessageExclusionServiceTest {
             .name("SWIFT UETR Block")
             .messageType("SWIFT")
             .extractorType("REGEX")
-            .extractorConfig(":121:([0-9a-f\\-]+)|1")
+            .extractorConfig(":121:([0-9a-f-]+)|1")  // Match hex chars and hyphen
             .excludedIdentifiers("blocked-uuid-123")
             .build();  // active and priority will use defaults
         
