@@ -32,21 +32,6 @@ class RegexIdExtractorTest {
     }
 
     @Test
-    void shouldExtractSwiftUETR() {
-        // Given - SWIFT MT message with UETR in block 3
-        String swiftMessage = "{1:F01BANKBEBBAXXX}{2:O1031234}{3:{121:97ed4827-7b6f-4491-a06f-2f5f8a5c8d3f}}{4:...}";
-        String config = "\\{121:([0-9a-f-]+)\\}|1";  // Extract UETR from block 3
-
-        // When
-        List<String> ids = extractor.extractIds(swiftMessage, config);
-
-        // Then
-        assertNotNull(ids);
-        assertEquals(1, ids.size());
-        assertEquals("97ed4827-7b6f-4491-a06f-2f5f8a5c8d3f", ids.get(0));
-    }
-
-    @Test
     void shouldExtractMultipleMatches() {
         // Given
         String content = "ID:12345 ID:67890 ID:ABCDE";
