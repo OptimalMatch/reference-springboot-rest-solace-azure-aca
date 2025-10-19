@@ -1,0 +1,70 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solace-service
+  namespace: solace-service
+  labels:
+    app: solace-service
+  annotations:
+    # Nginx ingress annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+
+    # CORS (if needed)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+
+    # Azure Application Gateway annotations (if using Azure)
+    # appgw.ingress.kubernetes.io/backend-path-prefix: "/"
+    # appgw.ingress.kubernetes.io/ssl-redirect: "true"
+
+    # Cert-manager annotations (if using cert-manager for TLS)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx  # Change to 'azure-application-gateway' if using Azure App Gateway
+
+  # TLS configuration
+  tls:
+  - hosts:
+    - solace-service.example.com  # Update with your domain
+    secretName: solace-service-tls
+
+  rules:
+  - host: solace-service.example.com  # Update with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: solace-service
+            port:
+              number: 80
+---
+# Alternative: Simple Ingress without TLS (for development)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solace-service-dev
+  namespace: solace-service
+  labels:
+    app: solace-service
+    environment: dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: solace-service
+            port:
+              number: 80

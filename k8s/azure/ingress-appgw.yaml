@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solace-service-appgw
+  namespace: solace-service
+  labels:
+    app: solace-service
+  annotations:
+    # Azure Application Gateway Ingress Controller annotations
+    kubernetes.io/ingress.class: azure/application-gateway
+    appgw.ingress.kubernetes.io/backend-path-prefix: "/"
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    appgw.ingress.kubernetes.io/connection-draining: "true"
+    appgw.ingress.kubernetes.io/connection-draining-timeout: "30"
+
+    # Health probe annotations
+    appgw.ingress.kubernetes.io/backend-protocol: "http"
+    appgw.ingress.kubernetes.io/health-probe-interval: "30"
+    appgw.ingress.kubernetes.io/health-probe-timeout: "10"
+    appgw.ingress.kubernetes.io/health-probe-unhealthy-threshold: "3"
+    appgw.ingress.kubernetes.io/health-probe-path: "/actuator/health"
+    appgw.ingress.kubernetes.io/health-probe-status-codes: "200-399"
+
+    # Request routing
+    appgw.ingress.kubernetes.io/request-timeout: "30"
+    appgw.ingress.kubernetes.io/cookie-based-affinity: "false"
+
+    # WAF and security
+    appgw.ingress.kubernetes.io/waf-policy-for-path: "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies/${WAF_POLICY_NAME}"
+
+    # SSL certificate from Azure Key Vault
+    appgw.ingress.kubernetes.io/appgw-ssl-certificate: "${SSL_CERTIFICATE_NAME}"
+
+    # Host name override
+    appgw.ingress.kubernetes.io/override-frontend-port: "443"
+spec:
+  tls:
+  - hosts:
+    - solace-service.${AZURE_DOMAIN}
+    secretName: solace-service-tls
+  rules:
+  - host: solace-service.${AZURE_DOMAIN}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: solace-service
+            port:
+              number: 80
+---
+# Alternative: Internal Load Balancer Ingress
+apiVersion: v1
+kind: Service
+metadata:
+  name: solace-service-internal
+  namespace: solace-service
+  labels:
+    app: solace-service
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-internal-subnet: "${AZURE_SUBNET_NAME}"
+spec:
+  type: LoadBalancer
+  selector:
+    app: solace-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  sessionAffinity: None

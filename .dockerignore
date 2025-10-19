@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+build/
+target/
+.gradle/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Documentation
+*.md
+docs/
+
+# Kubernetes
+k8s/
+azure-container-app.yaml
+
+# Test results
+performance-results/
+perf_results_*.txt
+
+# Scripts
+*.sh
+!gradlew
+
+# Azure
+Azurite-3.35.0/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Misc
+.DS_Store
+*.log
+tmp/
+temp/

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solace-service-config
+  namespace: solace-service
+  labels:
+    app: solace-service
+data:
+  # Application configuration
+  SPRING_APPLICATION_NAME: "solace-service"
+  SERVER_PORT: "8080"
+
+  # Solace configuration (non-sensitive)
+  SOLACE_ENABLED: "true"
+  SOLACE_HOST: "tcp://solace-broker:55555"
+  SOLACE_VPN: "default"
+  SOLACE_QUEUE_NAME: "test/topic"
+  SOLACE_TOPIC: "test/topic"
+
+  # Azure Storage configuration
+  AZURE_STORAGE_ENABLED: "false"
+  AZURE_STORAGE_CONTAINER_NAME: "solace-messages"
+
+  # Management endpoints
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,metrics,prometheus"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+
+  # Logging configuration
+  LOGGING_LEVEL_COM_EXAMPLE_SOLACESERVICE: "INFO"
+  LOGGING_LEVEL_COM_SOLACESYSTEMS: "INFO"
+
+  # Tomcat configuration
+  SERVER_TOMCAT_THREADS_MAX: "200"
+  SERVER_TOMCAT_THREADS_MIN_SPARE: "10"
+  SERVER_TOMCAT_MAX_CONNECTIONS: "10000"
+  SERVER_TOMCAT_ACCEPT_COUNT: "100"

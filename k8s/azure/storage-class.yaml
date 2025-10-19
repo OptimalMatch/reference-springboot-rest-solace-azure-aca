@@ -1,0 +1,39 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-disk-premium-retain
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+  kind: Managed
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-file-standard
+provisioner: file.csi.azure.com
+parameters:
+  skuName: Standard_LRS
+  protocol: smb
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+---
+# Example PersistentVolumeClaim (if needed for logs or data)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: solace-service-logs
+  namespace: solace-service
+  labels:
+    app: solace-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: azure-disk-premium-retain
+  resources:
+    requests:
+      storage: 10Gi

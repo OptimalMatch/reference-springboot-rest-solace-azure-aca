@@ -1,6 +1,6 @@
 # Solace Service
 
-A Spring Boot service that exposes REST endpoints and publishes messages to Solace queues, designed for deployment in Azure Container Apps.
+A Spring Boot service that exposes REST endpoints and publishes messages to Solace queues, designed for deployment in Azure Container Apps and Kubernetes.
 
 ## Features
 
@@ -139,7 +139,50 @@ The project includes TestContainers integration for testing with a real Solace b
 docker build -t solace-service .
 ```
 
-## Deploying to Azure Container Apps
+## Deployment Options
+
+### Azure Kubernetes Service (AKS) - Recommended
+
+Deploy to Azure AKS with full Azure integration:
+
+```bash
+# Complete automated setup (creates all Azure resources)
+./deploy-to-aks.sh all
+
+# Or step by step
+./deploy-to-aks.sh setup-azure    # Create AKS, ACR, Key Vault
+./deploy-to-aks.sh setup-aks      # Configure AKS addons
+./deploy-to-aks.sh setup-keyvault # Setup secrets
+./deploy-to-aks.sh build          # Build and push to ACR
+./deploy-to-aks.sh deploy         # Deploy to AKS
+```
+
+**Features:**
+- Azure Workload Identity for secure secrets access
+- Azure Key Vault integration (no secrets in code)
+- Azure Application Gateway with WAF
+- Azure Monitor + Application Insights
+- Auto-scaling and high availability
+
+See [AKS Deployment Guide](AKS-DEPLOYMENT-GUIDE.md) for complete instructions.
+
+### Generic Kubernetes (EKS, GKE, etc.)
+
+Deploy to any Kubernetes cluster:
+
+```bash
+# Quick deploy to development
+./k8s-deploy.sh all
+
+# Or deploy to production
+VERSION=v1.0.0 ./k8s-deploy.sh build
+VERSION=v1.0.0 ./k8s-deploy.sh push
+VERSION=v1.0.0 ./k8s-deploy.sh deploy-prod
+```
+
+See [Kubernetes Deployment Guide](KUBERNETES-DEPLOYMENT.md) for complete instructions.
+
+### Azure Container Apps
 
 1. Update the configuration in `deploy-to-azure.sh`
 2. Run the deployment script:

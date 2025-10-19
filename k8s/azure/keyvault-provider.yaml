@@ -1,0 +1,40 @@
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: solace-service-keyvault
+  namespace: solace-service
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "false"
+    # Use workload identity
+    clientID: "${AZURE_CLIENT_ID}"
+    keyvaultName: "${AZURE_KEYVAULT_NAME}"
+    cloudName: ""
+    objects: |
+      array:
+        - |
+          objectName: solace-username
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: solace-password
+          objectType: secret
+          objectVersion: ""
+        - |
+          objectName: azure-storage-connection-string
+          objectType: secret
+          objectVersion: ""
+    tenantId: "${AZURE_TENANT_ID}"
+  # Create Kubernetes secrets from Key Vault secrets
+  secretObjects:
+  - secretName: solace-service-secret
+    type: Opaque
+    data:
+    - objectName: solace-username
+      key: SOLACE_USERNAME
+    - objectName: solace-password
+      key: SOLACE_PASSWORD
+    - objectName: azure-storage-connection-string
+      key: AZURE_STORAGE_CONNECTION_STRING

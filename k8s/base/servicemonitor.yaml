@@ -1,0 +1,79 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: solace-service
+  namespace: solace-service
+  labels:
+    app: solace-service
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: solace-service
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - solace-service
+---
+# PrometheusRule for alerting (optional)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: solace-service-alerts
+  namespace: solace-service
+  labels:
+    app: solace-service
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: solace-service
+    interval: 30s
+    rules:
+    - alert: SolaceServiceDown
+      expr: up{job="solace-service"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Solace Service is down"
+        description: "Solace Service has been down for more than 5 minutes"
+
+    - alert: SolaceServiceHighMemory
+      expr: container_memory_usage_bytes{pod=~".*solace-service.*"} / container_spec_memory_limit_bytes{pod=~".*solace-service.*"} > 0.9
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage in Solace Service"
+        description: "Memory usage is above 90% for {{ $labels.pod }}"
+
+    - alert: SolaceServiceHighCPU
+      expr: rate(container_cpu_usage_seconds_total{pod=~".*solace-service.*"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage in Solace Service"
+        description: "CPU usage is above 80% for {{ $labels.pod }}"
+
+    - alert: SolaceServicePodRestarts
+      expr: rate(kube_pod_container_status_restarts_total{pod=~".*solace-service.*"}[1h]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Solace Service pod is restarting"
+        description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+
+    - alert: SolaceServiceHighErrorRate
+      expr: rate(http_server_requests_seconds_count{status=~"5..",job="solace-service"}[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High error rate in Solace Service"
+        description: "Error rate is above 5% for Solace Service"

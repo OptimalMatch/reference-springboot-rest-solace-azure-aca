@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solace-service
+  labels:
+    app: solace-service
+    environment: base

@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: solace-service-dev
+
+namePrefix: dev-
+
+commonLabels:
+  environment: dev
+
+bases:
+  - ../../base
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: solace-service
+      spec:
+        replicas: 1
+        template:
+          spec:
+            containers:
+            - name: solace-service
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: solace-service
+      spec:
+        minReplicas: 1
+        maxReplicas: 3
+
+configMapGenerator:
+  - name: solace-service-config
+    behavior: merge
+    literals:
+      - LOGGING_LEVEL_COM_EXAMPLE_SOLACESERVICE=DEBUG
+      - SOLACE_ENABLED=false
+
+images:
+  - name: solace-service
+    newName: your-registry/solace-service
+    newTag: dev-latest

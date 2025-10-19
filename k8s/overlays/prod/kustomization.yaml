@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: solace-service-prod
+
+namePrefix: prod-
+
+commonLabels:
+  environment: prod
+
+bases:
+  - ../../base
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: solace-service
+      spec:
+        replicas: 3
+        template:
+          spec:
+            containers:
+            - name: solace-service
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "500m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "2000m"
+
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: solace-service
+      spec:
+        minReplicas: 3
+        maxReplicas: 20
+
+configMapGenerator:
+  - name: solace-service-config
+    behavior: merge
+    literals:
+      - LOGGING_LEVEL_COM_EXAMPLE_SOLACESERVICE=INFO
+      - SOLACE_ENABLED=true
+      - AZURE_STORAGE_ENABLED=true
+
+images:
+  - name: solace-service
+    newName: your-registry/solace-service
+    newTag: v1.0.0
