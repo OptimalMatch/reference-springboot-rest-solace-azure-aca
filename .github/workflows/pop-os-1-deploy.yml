@@ -72,53 +72,26 @@ jobs:
             echo "Cannot connect to Kubernetes. Please check your Kubernetes installation."
           fi
 
-      # Verify or start Minikube
-      - name: Verify Minikube
+      # Verify Kubernetes is accessible (don't try to manage Minikube)
+      - name: Verify Kubernetes Access
         run: |
-          echo "Checking Kubernetes cluster availability..."
+          echo "Verifying Kubernetes cluster access..."
 
-          # First, try to connect to the cluster directly
-          if kubectl cluster-info &>/dev/null; then
-            echo "✅ Kubernetes cluster is accessible via kubectl"
-            kubectl cluster-info
+          # Check current context
+          CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
+          echo "Current context: $CURRENT_CONTEXT"
 
-            # Verify it's Minikube by checking the current context
-            CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
-            if [ "$CURRENT_CONTEXT" = "minikube" ]; then
-              echo "✅ Using Minikube cluster"
-            else
-              echo "⚠️ Current context is: $CURRENT_CONTEXT"
-              # Try to switch to minikube context if it exists
-              if kubectl config get-contexts minikube &>/dev/null; then
-                echo "Switching to minikube context..."
-                kubectl config use-context minikube
-              fi
-            fi
-          else
-            echo "Cluster not accessible. Checking if Minikube is available..."
-
-            if command -v minikube &> /dev/null; then
-              echo "Minikube is installed. Attempting to update context..."
-
-              # Try to update context first (doesn't require SSH)
-              minikube update-context 2>/dev/null || true
-              kubectl config use-context minikube 2>/dev/null || true
-
-              # Check if cluster is now accessible
-              if kubectl cluster-info &>/dev/null; then
-                echo "✅ Cluster is now accessible"
-              else
-                echo "Starting Minikube (this may take a few minutes)..."
-                minikube start --force
-              fi
-            else
-              echo "❌ No Kubernetes cluster available"
-              exit 1
-            fi
+          # Verify cluster is accessible
+          if ! kubectl cluster-info &>/dev/null; then
+            echo "❌ Cannot connect to Kubernetes cluster"
+            echo "Please ensure Minikube or another Kubernetes cluster is running"
+            exit 1
           fi
 
-          echo "✅ Kubernetes cluster is ready"
+          echo "✅ Kubernetes cluster is accessible"
           kubectl get nodes
+
+          echo "✅ Ready to deploy"
 
       # Build the Spring Boot application
       - name: Build Spring Boot application
@@ -141,11 +114,9 @@ jobs:
         run: |
           echo "Building Docker image for Solace Service..."
 
-          # If using Minikube, use its Docker daemon
-          if command -v minikube &> /dev/null && minikube status | grep -q "Running"; then
-            echo "Using Minikube's Docker daemon..."
-            eval $(minikube docker-env)
-          fi
+          # Use Minikube's Docker daemon (avoids pushing to registry)
+          # Don't check status - just use the environment
+          eval $(minikube docker-env) 2>/dev/null || echo "Note: Using host Docker daemon"
 
           # Build the image
           ./build-image.sh
