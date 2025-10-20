@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solace-service-config
+  namespace: solace-service
+data:
+  # Spring Boot Application settings
+  SERVER_PORT: "8080"
+  SPRING_PROFILES_ACTIVE: "local"
+
+  # Solace settings (can be overridden by secrets)
+  SOLACE_HOST: "tcp://solace-broker:55555"
+  SOLACE_VPN: "default"
+  SOLACE_QUEUE_NAME: "test.queue"
+
+  # Azure Storage settings
+  AZURE_STORAGE_ENABLED: "false"
+  AZURE_STORAGE_CONTAINER_NAME: "solace-messages"
+
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_EXAMPLE: "DEBUG"

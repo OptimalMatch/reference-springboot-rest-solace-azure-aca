@@ -166,6 +166,27 @@ Deploy to Azure AKS with full Azure integration:
 
 See [AKS Deployment Guide](AKS-DEPLOYMENT-GUIDE.md) for complete instructions.
 
+### Pop OS / Local Kubernetes (Minikube, MicroK8s, K3s)
+
+Deploy to a local Kubernetes cluster on Pop OS or similar Linux distributions:
+
+```bash
+# Automated deployment
+cd kubernetes-pop-os
+./deploy-local.sh
+
+# Or use GitHub Actions for automated deployment to pop-os-1
+# Configure self-hosted runner with 'pop-os-1' label
+```
+
+**Features:**
+- Automated local Kubernetes deployment
+- Support for Minikube, MicroK8s, and K3s
+- GitHub Actions integration for CI/CD
+- NodePort service for easy local access
+
+See [kubernetes-pop-os/README.md](kubernetes-pop-os/README.md) for complete instructions.
+
 ### Generic Kubernetes (EKS, GKE, etc.)
 
 Deploy to any Kubernetes cluster:
