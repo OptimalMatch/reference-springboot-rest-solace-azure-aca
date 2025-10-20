@@ -112,8 +112,9 @@ public class AzureStorageService {
 
             BlobClient blobClient = containerClient.getBlobClient(blobName);
 
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonContent.getBytes());
-            blobClient.upload(inputStream, jsonContent.length(), true);
+            byte[] jsonBytes = jsonContent.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonBytes);
+            blobClient.upload(inputStream, jsonBytes.length, true);
 
             log.info("Stored message {} to Azure Blob: {} (encrypted: {})",
                 message.getMessageId(), blobName, encryptionEnabled);
@@ -286,8 +287,9 @@ public class AzureStorageService {
             String jsonContent = objectMapper.writeValueAsString(record);
 
             BlobClient blobClient = containerClient.getBlobClient(blobName);
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonContent.getBytes());
-            blobClient.upload(inputStream, jsonContent.length(), true);
+            byte[] jsonBytes = jsonContent.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonBytes);
+            blobClient.upload(inputStream, jsonBytes.length, true);
 
             log.info("Stored transformation {} to Azure Blob: {} (encrypted: {})",
                 record.getTransformationId(), blobName, encryptionEnabled);

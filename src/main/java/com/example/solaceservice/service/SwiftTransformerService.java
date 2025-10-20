@@ -260,7 +260,14 @@ public class SwiftTransformerService {
         log.debug("Enriching message fields");
 
         // For now, just add a timestamp field
-        String enriched = message.replace("{3:{", "{3:{113:ENRICHED}");
+        String enriched;
+        if (message.contains("{3:{")) {
+            // If block 3 exists, add enrichment field to it
+            enriched = message.replace("{3:{", "{3:{113:ENRICHED}");
+        } else {
+            // If block 3 doesn't exist, insert it before block 4
+            enriched = message.replace("{4:", "{3:{113:ENRICHED}}{4:");
+        }
 
         List<String> warnings = new ArrayList<>();
         warnings.add("Basic enrichment applied - added timestamp marker");
@@ -277,11 +284,12 @@ public class SwiftTransformerService {
     private TransformationResult normalizeFormat(String message) {
         log.debug("Normalizing message format");
 
-        // Basic normalization: remove extra whitespace, standardize line endings
+        // Basic normalization: remove extra whitespace, standardize line endings, collapse multiple newlines
         String normalized = message.trim()
             .replaceAll("\\r\\n", "\n")
             .replaceAll("\\r", "\n")
-            .replaceAll(" +", " ");
+            .replaceAll("\\n{3,}", "\n\n")  // Collapse 3+ newlines to 2
+            .replaceAll(" +", " ");          // Collapse multiple spaces to 1
 
         return TransformationResult.success(normalized, "NORMALIZED", null);
     }
@@ -371,6 +379,10 @@ public class SwiftTransformerService {
      * @return Message type (e.g., "MT103", "MT202") or "UNKNOWN"
      */
     public String detectMessageType(String swiftMessage) {
+        if (swiftMessage == null || swiftMessage.isEmpty()) {
+            return "UNKNOWN";
+        }
+
         // Extract from Block 2 (Application Header)
         Pattern mtPattern = Pattern.compile("\\{2:I(\\d{3})");
         Matcher matcher = mtPattern.matcher(swiftMessage);

@@ -1,0 +1,501 @@
+package com.example.solaceservice.integration;
+
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.example.solaceservice.model.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.*;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import java.io.ByteArrayOutputStream;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+/**
+ * Integration tests for SWIFT Message Transformation Pipeline.
+ *
+ * Tests the complete end-to-end transformation flow:
+ * 1. Send SWIFT message to input queue
+ * 2. Listener consumes and transforms message
+ * 3. Transformed message published to output queue
+ * 4. Both messages stored encrypted in Azure Blob Storage
+ *
+ * REQUIREMENTS: Docker daemon must be running for these tests to execute.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
+class TransformationPipelineIntegrationTest {
+
+    @Container
+    static GenericContainer<?> solaceContainer = new GenericContainer<>("solace/solace-pubsub-standard:latest")
+            .withExposedPorts(55555, 8080)
+            .withEnv("username_admin_globalaccesslevel", "admin")
+            .withEnv("username_admin_password", "admin")
+            .withEnv("system_scaling_maxconnectioncount", "100")
+            .withSharedMemorySize(2_000_000_000L)
+            .withCreateContainerCmdModifier(cmd -> {
+                cmd.getHostConfig()
+                        .withUlimits(new com.github.dockerjava.api.model.Ulimit[] {
+                                new com.github.dockerjava.api.model.Ulimit("core", -1L, -1L),
+                                new com.github.dockerjava.api.model.Ulimit("nofile", 65536L, 1048576L)
+                        });
+            })
+            .waitingFor(Wait.forHttp("/").forPort(8080).forStatusCode(200)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(120)))
+            .waitingFor(Wait.forListeningPorts(55555)
+                    .withStartupTimeout(java.time.Duration.ofSeconds(120)));
+
+    @Container
+    static GenericContainer<?> azuriteContainer = new GenericContainer<>("mcr.microsoft.com/azure-storage/azurite:latest")
+            .withExposedPorts(10000, 10001, 10002)
+            .withCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data")
+            .waitingFor(Wait.forListeningPort()
+                    .withStartupTimeout(java.time.Duration.ofSeconds(30)));
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired(required = false)
+    private JmsTemplate jmsTemplate;
+
+    // Mock the listeners so they don't try to consume from non-existent queues
+    @MockBean(name = "messageTransformationListener")
+    private com.example.solaceservice.listener.MessageTransformationListener messageTransformationListener;
+
+    @MockBean(name = "deadLetterQueueListener")
+    private com.example.solaceservice.listener.DeadLetterQueueListener deadLetterQueueListener;
+
+    @MockBean(name = "messageListener")
+    private com.example.solaceservice.listener.MessageListener messageListener;
+
+    @Autowired(required = false)
+    private com.example.solaceservice.service.SwiftTransformerService transformerService;
+
+    @Autowired(required = false)
+    private com.example.solaceservice.service.AzureStorageService azureStorageService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+    private String baseUrl;
+    private BlobServiceClient blobServiceClient;
+    private static String testEncryptionKey;
+
+    @BeforeAll
+    static void generateEncryptionKey() throws Exception {
+        // Generate test encryption key
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256, new SecureRandom());
+        SecretKey testKey = keyGen.generateKey();
+        testEncryptionKey = Base64.getEncoder().encodeToString(testKey.getEncoded());
+    }
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        // Solace configuration
+        registry.add("spring.jms.solace.enabled", () -> "true");
+        registry.add("spring.jms.solace.host", () ->
+                "tcp://" + solaceContainer.getHost() + ":" + solaceContainer.getMappedPort(55555));
+        registry.add("spring.jms.solace.username", () -> "default");
+        registry.add("spring.jms.solace.password", () -> "default");
+        registry.add("spring.jms.solace.vpn-name", () -> "default");
+
+        // Azure Storage configuration (Azurite)
+        String azuriteConnectionString = String.format(
+                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://%s:%d/devstoreaccount1;",
+                azuriteContainer.getHost(),
+                azuriteContainer.getMappedPort(10000)
+        );
+        registry.add("azure.storage.enabled", () -> "true");
+        registry.add("azure.storage.connection-string", () -> azuriteConnectionString);
+        registry.add("azure.storage.container-name", () -> "solace-messages");
+
+        // Encryption configuration (local mode for testing)
+        registry.add("azure.storage.encryption.enabled", () -> "true");
+        registry.add("azure.storage.encryption.local-mode", () -> "true");
+        registry.add("azure.storage.encryption.local-key", () -> testEncryptionKey);
+
+        // Transformation configuration
+        registry.add("transformation.enabled", () -> "true");
+        registry.add("transformation.input-queue", () -> "swift/mt103/inbound");
+        registry.add("transformation.output-queue", () -> "swift/mt202/outbound");
+        registry.add("transformation.transformation-type", () -> "MT103_TO_MT202");
+        registry.add("transformation.store-results", () -> "true");
+    }
+
+    @BeforeEach
+    void setUp() {
+        baseUrl = "http://localhost:" + port;
+
+        // Initialize Azure Blob Storage client
+        String connectionString = String.format(
+                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://%s:%d/devstoreaccount1;",
+                azuriteContainer.getHost(),
+                azuriteContainer.getMappedPort(10000)
+        );
+
+        blobServiceClient = new BlobServiceClientBuilder()
+                .connectionString(connectionString)
+                .buildClient();
+
+        // Create container if it doesn't exist
+        BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("solace-messages");
+        if (!containerClient.exists()) {
+            containerClient.create();
+        }
+    }
+
+    @Test
+    void testMT103ToMT202TransformationEndToEnd() throws Exception {
+        // Given - MT103 message
+        String mt103Message = "{1:F01BANKUS33AXXX0000000000}{2:I103BANKDE55XXXXN}{3:{108:MT103 001}}{4:\n" +
+                ":20:REF123456789\n" +
+                ":32A:250120USD100000,00\n" +
+                ":50K:/1234567890\nJOHN DOE\n123 MAIN ST\n" +
+                ":59:/0987654321\nJANE SMITH\n456 ELM ST\n" +
+                ":71A:SHA\n" +
+                "-}";
+
+        MessageRequest request = new MessageRequest();
+        request.setContent(mt103Message);
+        request.setDestination("swift/mt103/inbound");
+        request.setCorrelationId("test-transform-001");
+
+        // When - send message via REST API
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<MessageRequest> entity = new HttpEntity<>(request, headers);
+
+        ResponseEntity<MessageResponse> response = restTemplate.exchange(
+                baseUrl + "/api/messages",
+                HttpMethod.POST,
+                entity,
+                MessageResponse.class
+        );
+
+        // Then - message should be sent successfully
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        String messageId = response.getBody().getMessageId();
+        assertThat(messageId).isNotBlank();
+
+        // Wait for transformation to complete and be stored
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    // Check if transformation record exists in blob storage
+                    BlobContainerClient containerClient = blobServiceClient
+                            .getBlobContainerClient("solace-messages");
+
+                    boolean transformationFound = containerClient.listBlobs()
+                            .stream()
+                            .anyMatch(blob -> blob.getName().startsWith("transformation-"));
+
+                    assertThat(transformationFound)
+                            .as("Transformation record should be stored in blob storage")
+                            .isTrue();
+                });
+
+        // Verify transformation record content
+        BlobContainerClient containerClient = blobServiceClient
+                .getBlobContainerClient("solace-messages");
+
+        BlobClient transformationBlob = containerClient.listBlobs()
+                .stream()
+                .filter(blob -> blob.getName().startsWith("transformation-"))
+                .findFirst()
+                .map(blob -> containerClient.getBlobClient(blob.getName()))
+                .orElseThrow(() -> new AssertionError("Transformation blob not found"));
+
+        // Download and parse transformation record
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        transformationBlob.downloadStream(outputStream);
+        String transformationJson = outputStream.toString();
+
+        TransformationRecord record = objectMapper.readValue(transformationJson, TransformationRecord.class);
+
+        // Verify transformation record
+        assertThat(record).isNotNull();
+        assertThat(record.getTransformationId()).isNotBlank();
+        assertThat(record.getTransformationType()).isEqualTo(TransformationType.MT103_TO_MT202);
+        assertThat(record.getStatus()).isEqualTo(TransformationStatus.SUCCESS);
+        assertThat(record.getCorrelationId()).isEqualTo("test-transform-001");
+
+        // Verify both input and output messages are encrypted
+        assertThat(record.getEncryptedInputMessage()).isNotBlank();
+        assertThat(record.getEncryptedInputMessageKey()).isNotBlank();
+        assertThat(record.getInputMessageIv()).isNotBlank();
+        assertThat(record.getInputMessageType()).isEqualTo("MT103");
+
+        assertThat(record.getEncryptedOutputMessage()).isNotBlank();
+        assertThat(record.getEncryptedOutputMessageKey()).isNotBlank();
+        assertThat(record.getOutputMessageIv()).isNotBlank();
+        assertThat(record.getOutputMessageType()).isEqualTo("MT202");
+
+        // Verify plaintext messages are not stored
+        assertThat(record.getInputMessage()).isNull();
+        assertThat(record.getOutputMessage()).isNull();
+
+        // Verify metadata
+        assertThat(record.getInputQueue()).contains("swift/mt103/inbound");
+        assertThat(record.getOutputQueue()).contains("swift/mt202/outbound");
+        assertThat(record.getProcessingTimeMs()).isGreaterThan(0L);
+        assertThat(record.isEncrypted()).isTrue();
+        assertThat(record.getEncryptionAlgorithm()).isEqualTo("AES-256-GCM");
+    }
+
+    @Test
+    void testTransformationWithInvalidMessageFormat() throws Exception {
+        // Given - invalid SWIFT message
+        String invalidMessage = "This is not a valid SWIFT message";
+
+        MessageRequest request = new MessageRequest();
+        request.setContent(invalidMessage);
+        request.setDestination("swift/mt103/inbound");
+        request.setCorrelationId("test-invalid-001");
+
+        // When - send message
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<MessageRequest> entity = new HttpEntity<>(request, headers);
+
+        ResponseEntity<MessageResponse> response = restTemplate.exchange(
+                baseUrl + "/api/messages",
+                HttpMethod.POST,
+                entity,
+                MessageResponse.class
+        );
+
+        // Then - message should be sent
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Wait for processing
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    BlobContainerClient containerClient = blobServiceClient
+                            .getBlobContainerClient("solace-messages");
+
+                    boolean transformationFound = containerClient.listBlobs()
+                            .stream()
+                            .anyMatch(blob -> blob.getName().startsWith("transformation-"));
+
+                    assertThat(transformationFound)
+                            .as("Failed transformation should still be stored")
+                            .isTrue();
+                });
+
+        // Verify transformation record shows failure
+        BlobContainerClient containerClient = blobServiceClient
+                .getBlobContainerClient("solace-messages");
+
+        BlobClient transformationBlob = containerClient.listBlobs()
+                .stream()
+                .filter(blob -> blob.getName().startsWith("transformation-"))
+                .findFirst()
+                .map(blob -> containerClient.getBlobClient(blob.getName()))
+                .orElseThrow(() -> new AssertionError("Transformation blob not found"));
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        transformationBlob.downloadStream(outputStream);
+        String transformationJson = outputStream.toString();
+
+        TransformationRecord record = objectMapper.readValue(transformationJson, TransformationRecord.class);
+
+        // Should have failed status
+        assertThat(record.getStatus()).isIn(
+                TransformationStatus.PARSE_ERROR,
+                TransformationStatus.FAILED
+        );
+        assertThat(record.getErrorMessage()).isNotBlank();
+    }
+
+    @Test
+    void testTransformationWithMissingRequiredField() throws Exception {
+        // Given - MT103 missing required :32A: field
+        String incompleteMt103 = "{1:F01BANKUS33AXXX0000000000}{2:I103BANKDE55XXXXN}{4:\n" +
+                ":20:REF123456789\n" +
+                ":50K:/1234567890\nJOHN DOE\n" +
+                ":59:/0987654321\nJANE SMITH\n" +
+                "-}";
+
+        MessageRequest request = new MessageRequest();
+        request.setContent(incompleteMt103);
+        request.setDestination("swift/mt103/inbound");
+        request.setCorrelationId("test-incomplete-001");
+
+        // When - send message
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<MessageRequest> entity = new HttpEntity<>(request, headers);
+
+        ResponseEntity<MessageResponse> response = restTemplate.exchange(
+                baseUrl + "/api/messages",
+                HttpMethod.POST,
+                entity,
+                MessageResponse.class
+        );
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Wait and verify error is recorded
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    BlobContainerClient containerClient = blobServiceClient
+                            .getBlobContainerClient("solace-messages");
+
+                    BlobClient transformationBlob = containerClient.listBlobs()
+                            .stream()
+                            .filter(blob -> blob.getName().startsWith("transformation-"))
+                            .findFirst()
+                            .map(blob -> containerClient.getBlobClient(blob.getName()))
+                            .orElse(null);
+
+                    if (transformationBlob != null) {
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        transformationBlob.downloadStream(outputStream);
+                        String transformationJson = outputStream.toString();
+
+                        TransformationRecord record = objectMapper.readValue(transformationJson, TransformationRecord.class);
+
+                        assertThat(record.getStatus()).isEqualTo(TransformationStatus.VALIDATION_ERROR);
+                        assertThat(record.getErrorMessage()).contains("32A");
+                    }
+                });
+    }
+
+    @Test
+    void testMultipleTransformationsInParallel() throws Exception {
+        // Given - multiple MT103 messages
+        String[] messages = new String[5];
+        for (int i = 0; i < 5; i++) {
+            messages[i] = "{1:F01BANKUS33AXXX0000000000}{2:I103BANKDE55XXXXN}{4:\n" +
+                    ":20:REF" + i + "\n" +
+                    ":32A:250120USD" + (1000 * (i + 1)) + ",00\n" +
+                    ":50K:/12345\nCUSTOMER " + i + "\n" +
+                    ":59:/67890\nBENEFICIARY " + i + "\n" +
+                    ":71A:SHA\n" +
+                    "-}";
+        }
+
+        // When - send all messages in parallel
+        for (int i = 0; i < messages.length; i++) {
+            MessageRequest request = new MessageRequest();
+            request.setContent(messages[i]);
+            request.setDestination("swift/mt103/inbound");
+            request.setCorrelationId("test-parallel-" + i);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<MessageRequest> entity = new HttpEntity<>(request, headers);
+
+            restTemplate.exchange(
+                    baseUrl + "/api/messages",
+                    HttpMethod.POST,
+                    entity,
+                    MessageResponse.class
+            );
+        }
+
+        // Then - all transformations should be stored
+        await().atMost(60, TimeUnit.SECONDS)
+                .pollInterval(2, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    BlobContainerClient containerClient = blobServiceClient
+                            .getBlobContainerClient("solace-messages");
+
+                    long transformationCount = containerClient.listBlobs()
+                            .stream()
+                            .filter(blob -> blob.getName().startsWith("transformation-"))
+                            .count();
+
+                    assertThat(transformationCount)
+                            .as("All transformations should be stored")
+                            .isGreaterThanOrEqualTo(5);
+                });
+    }
+
+    @Test
+    void testTransformationPreservesCorrelationId() throws Exception {
+        // Given
+        String mt103 = "{1:F01BANKUS33AXXX0000000000}{2:I103BANKDE55XXXXN}{4:\n" +
+                ":20:CORRELTEST001\n" +
+                ":32A:250120USD5000,00\n" +
+                ":50K:/12345\nTEST CUSTOMER\n" +
+                ":59:/67890\nTEST BENEFICIARY\n" +
+                ":71A:SHA\n" +
+                "-}";
+
+        String correlationId = "correlation-test-" + System.currentTimeMillis();
+
+        MessageRequest request = new MessageRequest();
+        request.setContent(mt103);
+        request.setDestination("swift/mt103/inbound");
+        request.setCorrelationId(correlationId);
+
+        // When
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<MessageRequest> entity = new HttpEntity<>(request, headers);
+
+        restTemplate.exchange(
+                baseUrl + "/api/messages",
+                HttpMethod.POST,
+                entity,
+                MessageResponse.class
+        );
+
+        // Then - verify correlation ID is preserved
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    BlobContainerClient containerClient = blobServiceClient
+                            .getBlobContainerClient("solace-messages");
+
+                    BlobClient transformationBlob = containerClient.listBlobs()
+                            .stream()
+                            .filter(blob -> blob.getName().startsWith("transformation-"))
+                            .findFirst()
+                            .map(blob -> containerClient.getBlobClient(blob.getName()))
+                            .orElseThrow();
+
+                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                    transformationBlob.downloadStream(outputStream);
+                    String transformationJson = outputStream.toString();
+
+                    TransformationRecord record = objectMapper.readValue(transformationJson, TransformationRecord.class);
+
+                    assertThat(record.getCorrelationId()).isEqualTo(correlationId);
+                });
+    }
+}

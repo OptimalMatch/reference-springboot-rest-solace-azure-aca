@@ -74,3 +74,43 @@ transformation:
 
   # Storage
   store-results: ${TRANSFORMATION_STORE_RESULTS:true}
+
+  # Retry configuration
+  retry:
+    # Enable/disable retry mechanism
+    enabled: ${TRANSFORMATION_RETRY_ENABLED:false}
+
+    # Maximum number of retry attempts
+    max-attempts: ${TRANSFORMATION_RETRY_MAX_ATTEMPTS:3}
+
+    # Initial retry interval in milliseconds
+    initial-interval-ms: ${TRANSFORMATION_RETRY_INITIAL_INTERVAL_MS:1000}
+
+    # Maximum retry interval in milliseconds (cap for exponential backoff)
+    max-interval-ms: ${TRANSFORMATION_RETRY_MAX_INTERVAL_MS:60000}
+
+    # Multiplier for exponential backoff
+    multiplier: ${TRANSFORMATION_RETRY_MULTIPLIER:2.0}
+
+    # Use jitter to prevent thundering herd
+    use-jitter: ${TRANSFORMATION_RETRY_USE_JITTER:true}
+
+    # Statuses that trigger retry (comma-separated)
+    retryable-statuses: ${TRANSFORMATION_RETRY_RETRYABLE_STATUSES:TIMEOUT,FAILED,VALIDATION_ERROR}
+
+    # Send to dead-letter queue after max retries
+    send-to-dead-letter-queue-on-failure: ${TRANSFORMATION_RETRY_SEND_TO_DLQ:true}
+
+    # Store each retry attempt (false = only store final result)
+    store-retry-attempts: ${TRANSFORMATION_RETRY_STORE_ATTEMPTS:false}
+
+  # Dead-letter queue configuration
+  dead-letter-queue:
+    # Enable/disable DLQ
+    enabled: ${TRANSFORMATION_DLQ_ENABLED:false}
+
+    # DLQ name
+    queue-name: ${TRANSFORMATION_DLQ_NAME:swift/transformation/dead-letter}
+
+    # Store DLQ messages to Azure Blob
+    store-messages: ${TRANSFORMATION_DLQ_STORE:true}
