@@ -59,3 +59,18 @@ azure:
     # For production with Azure Key Vault (when local-mode=false)
     uri: ${AZURE_KEYVAULT_URI:}
     key-name: ${AZURE_KEYVAULT_KEY_NAME:blob-encryption-key}
+
+# Message transformation configuration
+transformation:
+  # Enable/disable transformation listener
+  enabled: ${TRANSFORMATION_ENABLED:false}
+
+  # Queue configuration
+  input-queue: ${TRANSFORMATION_INPUT_QUEUE:swift/mt103/inbound}
+  output-queue: ${TRANSFORMATION_OUTPUT_QUEUE:swift/mt202/outbound}
+
+  # Transformation type (see TransformationType enum)
+  transformation-type: ${TRANSFORMATION_TYPE:MT103_TO_MT202}
+
+  # Storage
+  store-results: ${TRANSFORMATION_STORE_RESULTS:true}
