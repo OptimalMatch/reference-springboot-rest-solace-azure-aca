@@ -235,4 +235,242 @@ public class AzureStorageService {
     private String generateBlobName(StoredMessage message) {
         return "message-" + message.getMessageId() + ".json";
     }
+
+    // =========================================================================
+    // Transformation Record Storage
+    // =========================================================================
+
+    /**
+     * Store transformation record to Azure Blob Storage (with encryption).
+     *
+     * <p>Both input and output messages are encrypted separately with unique DEKs.</p>
+     *
+     * @param record Transformation record to store
+     */
+    public void storeTransformation(com.example.solaceservice.model.TransformationRecord record) {
+        try {
+            log.debug("Storing transformation record: {}", record.getTransformationId());
+
+            // Apply client-side encryption if enabled
+            if (encryptionEnabled && encryptionService != null) {
+                // Encrypt input message if present and not already encrypted
+                if (record.getInputMessage() != null && !record.isEncrypted()) {
+                    log.debug("Encrypting input message for transformation {}", record.getTransformationId());
+                    EncryptionService.EncryptedData encryptedInput = encryptionService.encrypt(record.getInputMessage());
+
+                    record.setEncryptedInputMessage(encryptedInput.getEncryptedContent());
+                    record.setEncryptedInputMessageKey(encryptedInput.getEncryptedDataKey());
+                    record.setInputMessageIv(encryptedInput.getIv());
+                    record.setInputMessage(null); // Clear plaintext
+                }
+
+                // Encrypt output message if present and not already encrypted
+                if (record.getOutputMessage() != null && !record.isEncrypted()) {
+                    log.debug("Encrypting output message for transformation {}", record.getTransformationId());
+                    EncryptionService.EncryptedData encryptedOutput = encryptionService.encrypt(record.getOutputMessage());
+
+                    record.setEncryptedOutputMessage(encryptedOutput.getEncryptedContent());
+                    record.setEncryptedOutputMessageKey(encryptedOutput.getEncryptedDataKey());
+                    record.setOutputMessageIv(encryptedOutput.getIv());
+                    record.setOutputMessage(null); // Clear plaintext
+
+                    // Set encryption metadata (same for both messages)
+                    record.setEncryptionAlgorithm(encryptedOutput.getAlgorithm());
+                    record.setKeyVaultKeyId(encryptedOutput.getKeyId());
+                }
+
+                record.setEncrypted(true);
+            }
+
+            String blobName = generateTransformationBlobName(record);
+            String jsonContent = objectMapper.writeValueAsString(record);
+
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonContent.getBytes());
+            blobClient.upload(inputStream, jsonContent.length(), true);
+
+            log.info("Stored transformation {} to Azure Blob: {} (encrypted: {})",
+                record.getTransformationId(), blobName, encryptionEnabled);
+
+        } catch (Exception e) {
+            log.error("Failed to store transformation {} to Azure Blob Storage",
+                record.getTransformationId(), e);
+            throw new RuntimeException("Failed to store transformation to Azure", e);
+        }
+    }
+
+    /**
+     * Retrieve transformation record from Azure Blob Storage (with decryption).
+     *
+     * @param transformationId Transformation ID
+     * @return TransformationRecord or null if not found
+     */
+    public com.example.solaceservice.model.TransformationRecord retrieveTransformation(String transformationId) {
+        try {
+            String blobName = "transformation-" + transformationId + ".json";
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+
+            if (!blobClient.exists()) {
+                return null;
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            blobClient.downloadStream(outputStream);
+
+            String jsonContent = outputStream.toString();
+            com.example.solaceservice.model.TransformationRecord record =
+                objectMapper.readValue(jsonContent, com.example.solaceservice.model.TransformationRecord.class);
+
+            // Decrypt if record is encrypted
+            if (record.isEncrypted() && encryptionService != null) {
+                log.debug("Decrypting transformation {}", transformationId);
+
+                // Decrypt input message
+                if (record.getEncryptedInputMessage() != null) {
+                    EncryptionService.EncryptedData encryptedInput = EncryptionService.EncryptedData.builder()
+                        .encryptedContent(record.getEncryptedInputMessage())
+                        .encryptedDataKey(record.getEncryptedInputMessageKey())
+                        .iv(record.getInputMessageIv())
+                        .algorithm(record.getEncryptionAlgorithm())
+                        .keyId(record.getKeyVaultKeyId())
+                        .build();
+
+                    String decryptedInput = encryptionService.decrypt(encryptedInput);
+                    record.setInputMessage(decryptedInput);
+                }
+
+                // Decrypt output message
+                if (record.getEncryptedOutputMessage() != null) {
+                    EncryptionService.EncryptedData encryptedOutput = EncryptionService.EncryptedData.builder()
+                        .encryptedContent(record.getEncryptedOutputMessage())
+                        .encryptedDataKey(record.getEncryptedOutputMessageKey())
+                        .iv(record.getOutputMessageIv())
+                        .algorithm(record.getEncryptionAlgorithm())
+                        .keyId(record.getKeyVaultKeyId())
+                        .build();
+
+                    String decryptedOutput = encryptionService.decrypt(encryptedOutput);
+                    record.setOutputMessage(decryptedOutput);
+                }
+
+                log.debug("Transformation {} decrypted successfully", transformationId);
+            }
+
+            log.info("Retrieved transformation {} from Azure Blob (encrypted: {})",
+                transformationId, record.isEncrypted());
+            return record;
+
+        } catch (Exception e) {
+            log.error("Failed to retrieve transformation {} from Azure Blob Storage", transformationId, e);
+            throw new RuntimeException("Failed to retrieve transformation from Azure", e);
+        }
+    }
+
+    /**
+     * List recent transformation records from Azure Blob Storage.
+     *
+     * @param limit Maximum number of records to return
+     * @return List of TransformationRecord objects
+     */
+    public List<com.example.solaceservice.model.TransformationRecord> listTransformations(int limit) {
+        try {
+            List<com.example.solaceservice.model.TransformationRecord> transformations = new ArrayList<>();
+
+            for (BlobItem blobItem : containerClient.listBlobs()) {
+                if (transformations.size() >= limit) {
+                    break;
+                }
+
+                if (blobItem.getName().startsWith("transformation-") && blobItem.getName().endsWith(".json")) {
+                    try {
+                        BlobClient blobClient = containerClient.getBlobClient(blobItem.getName());
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        blobClient.downloadStream(outputStream);
+
+                        String jsonContent = outputStream.toString();
+                        com.example.solaceservice.model.TransformationRecord record =
+                            objectMapper.readValue(jsonContent, com.example.solaceservice.model.TransformationRecord.class);
+
+                        // Decrypt if encrypted
+                        if (record.isEncrypted() && encryptionService != null) {
+                            // Decrypt input message
+                            if (record.getEncryptedInputMessage() != null) {
+                                EncryptionService.EncryptedData encryptedInput = EncryptionService.EncryptedData.builder()
+                                    .encryptedContent(record.getEncryptedInputMessage())
+                                    .encryptedDataKey(record.getEncryptedInputMessageKey())
+                                    .iv(record.getInputMessageIv())
+                                    .algorithm(record.getEncryptionAlgorithm())
+                                    .keyId(record.getKeyVaultKeyId())
+                                    .build();
+
+                                String decryptedInput = encryptionService.decrypt(encryptedInput);
+                                record.setInputMessage(decryptedInput);
+                            }
+
+                            // Decrypt output message
+                            if (record.getEncryptedOutputMessage() != null) {
+                                EncryptionService.EncryptedData encryptedOutput = EncryptionService.EncryptedData.builder()
+                                    .encryptedContent(record.getEncryptedOutputMessage())
+                                    .encryptedDataKey(record.getEncryptedOutputMessageKey())
+                                    .iv(record.getOutputMessageIv())
+                                    .algorithm(record.getEncryptionAlgorithm())
+                                    .keyId(record.getKeyVaultKeyId())
+                                    .build();
+
+                                String decryptedOutput = encryptionService.decrypt(encryptedOutput);
+                                record.setOutputMessage(decryptedOutput);
+                            }
+                        }
+
+                        transformations.add(record);
+
+                    } catch (Exception e) {
+                        log.warn("Failed to parse transformation record: {}", blobItem.getName(), e);
+                    }
+                }
+            }
+
+            log.info("Listed {} transformation records from Azure Blob Storage", transformations.size());
+            return transformations;
+
+        } catch (Exception e) {
+            log.error("Failed to list transformations from Azure Blob Storage", e);
+            throw new RuntimeException("Failed to list transformations from Azure", e);
+        }
+    }
+
+    /**
+     * Delete transformation record from Azure Blob Storage.
+     *
+     * @param transformationId Transformation ID
+     * @return true if deleted, false if not found
+     */
+    public boolean deleteTransformation(String transformationId) {
+        try {
+            String blobName = "transformation-" + transformationId + ".json";
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+
+            if (blobClient.exists()) {
+                blobClient.delete();
+                log.info("Deleted transformation {} from Azure Blob", transformationId);
+                return true;
+            }
+
+            return false;
+
+        } catch (Exception e) {
+            log.error("Failed to delete transformation {} from Azure Blob Storage", transformationId, e);
+            throw new RuntimeException("Failed to delete transformation from Azure", e);
+        }
+    }
+
+    /**
+     * Generate blob name for transformation record.
+     *
+     * @param record Transformation record
+     * @return Blob name
+     */
+    private String generateTransformationBlobName(com.example.solaceservice.model.TransformationRecord record) {
+        return "transformation-" + record.getTransformationId() + ".json";
+    }
 }
