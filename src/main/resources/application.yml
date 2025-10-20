@@ -47,3 +47,15 @@ azure:
     enabled: ${AZURE_STORAGE_ENABLED:false}
     connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
     container-name: ${AZURE_STORAGE_CONTAINER_NAME:solace-messages}
+    encryption:
+      enabled: ${AZURE_STORAGE_ENCRYPTION_ENABLED:false}
+      # Local mode for development/testing (no Key Vault required)
+      local-mode: ${AZURE_STORAGE_ENCRYPTION_LOCAL_MODE:true}
+      # Local encryption key (Base64-encoded 32-byte AES key)
+      # Generate with: openssl rand -base64 32
+      local-key: ${AZURE_STORAGE_ENCRYPTION_LOCAL_KEY:}
+
+  keyvault:
+    # For production with Azure Key Vault (when local-mode=false)
+    uri: ${AZURE_KEYVAULT_URI:}
+    key-name: ${AZURE_KEYVAULT_KEY_NAME:blob-encryption-key}

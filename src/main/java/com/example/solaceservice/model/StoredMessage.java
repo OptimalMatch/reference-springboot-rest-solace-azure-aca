@@ -12,7 +12,18 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class StoredMessage {
     private String messageId;
+
+    // Plaintext content (for backward compatibility and unencrypted mode)
     private String content;
+
+    // Encrypted content fields (for encrypted mode)
+    private String encryptedContent;      // Base64-encoded encrypted message content
+    private String encryptedDataKey;      // Base64-encoded encrypted DEK
+    private String encryptionIv;          // Base64-encoded initialization vector
+    private String encryptionAlgorithm;   // "AES-256-GCM"
+    private String keyVaultKeyId;         // Key Vault key identifier or "local-key"
+    private boolean encrypted;            // Flag indicating if message is encrypted
+
     private String destination;
     private String correlationId;
 
@@ -21,14 +32,19 @@ public class StoredMessage {
 
     private String originalStatus;
 
+    /**
+     * Creates a StoredMessage from a MessageRequest (unencrypted).
+     * Use AzureStorageService.storeMessage() which will encrypt if encryption is enabled.
+     */
     public static StoredMessage fromRequest(MessageRequest request, String messageId, String status) {
-        return new StoredMessage(
-            messageId,
-            request.getContent(),
-            request.getDestination(),
-            request.getCorrelationId(),
-            LocalDateTime.now(),
-            status
-        );
+        StoredMessage message = new StoredMessage();
+        message.setMessageId(messageId);
+        message.setContent(request.getContent());
+        message.setDestination(request.getDestination());
+        message.setCorrelationId(request.getCorrelationId());
+        message.setTimestamp(LocalDateTime.now());
+        message.setOriginalStatus(status);
+        message.setEncrypted(false);
+        return message;
     }
 }
