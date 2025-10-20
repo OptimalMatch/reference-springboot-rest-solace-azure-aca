@@ -77,20 +77,48 @@ jobs:
         run: |
           echo "Verifying Kubernetes cluster access..."
 
+          # Setup kubectl config for github-runner if needed
+          if [ ! -f ~/.kube/config ]; then
+            echo "Setting up kubectl config..."
+            mkdir -p ~/.kube
+            cat > ~/.kube/config << 'KUBECONFIG'
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /home/unidatum/.minikube/ca.crt
+    server: https://192.168.49.2:8443
+  name: minikube
+contexts:
+- context:
+    cluster: minikube
+    namespace: default
+    user: minikube
+  name: minikube
+current-context: minikube
+kind: Config
+preferences: {}
+users:
+- name: minikube
+  user:
+    client-certificate: /home/unidatum/.minikube/profiles/minikube/client.crt
+    client-key: /home/unidatum/.minikube/profiles/minikube/client.key
+KUBECONFIG
+            chmod 600 ~/.kube/config
+          fi
+
           # Check current context
           CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "none")
           echo "Current context: $CURRENT_CONTEXT"
 
-          # Verify cluster is accessible
-          if ! kubectl cluster-info &>/dev/null; then
+          # Verify cluster is accessible with a simple pod query
+          # (get nodes can hang on some Minikube setups)
+          if ! kubectl get pods --all-namespaces --request-timeout=10s &>/dev/null; then
             echo "❌ Cannot connect to Kubernetes cluster"
             echo "Please ensure Minikube or another Kubernetes cluster is running"
             exit 1
           fi
 
           echo "✅ Kubernetes cluster is accessible"
-          kubectl get nodes
-
           echo "✅ Ready to deploy"
 
       # Build the Spring Boot application
