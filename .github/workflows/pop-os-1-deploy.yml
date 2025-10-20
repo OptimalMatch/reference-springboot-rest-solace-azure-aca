@@ -1,0 +1,315 @@
+# This workflow will deploy the Solace Service to a self-hosted Kubernetes cluster on Pop OS
+#
+# To configure this workflow:
+#
+# 1. Set up a self-hosted GitHub runner on your Pop OS server
+#    - Follow instructions at: https://docs.github.com/en/actions/hosting-your-own-runners
+#    - Tag the runner with 'pop-os-1' label
+#
+# 2. Ensure the runner has access to:
+#    - Docker
+#    - kubectl
+#    - Java 21 (for building the application)
+#    - A running Kubernetes cluster (MicroK8s, K3s, or Minikube)
+#    - Proper permissions to create/modify resources in the cluster
+
+name: Deploy to Pop OS Kubernetes pop-os-1
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "build.gradle"
+      - "kubernetes-pop-os/**"
+      - ".github/workflows/pop-os-1-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      solace_enabled:
+        description: 'Enable Solace broker connection'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      azure_storage_enabled:
+        description: 'Enable Azure Blob Storage'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  SOLACE_ENABLED: ${{ github.event.inputs.solace_enabled || 'false' }}
+  AZURE_STORAGE_ENABLED: ${{ github.event.inputs.azure_storage_enabled || 'false' }}
+  MANIFEST_DIR: "kubernetes-pop-os"
+
+jobs:
+  deploy:
+    name: Deploy to Pop OS Kubernetes pop-os-1
+    # Ensure this job only runs on runners with the 'pop-os-1' label
+    # This ensures the workflow only runs on the designated Pop OS server
+    runs-on: [self-hosted, pop-os-1]
+
+    steps:
+      # Checks out the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Verify Kubernetes connection
+      - name: Verify Kubernetes connection
+        run: |
+          echo "Verifying Kubernetes connection..."
+          if kubectl get nodes &>/dev/null; then
+            echo "Kubernetes connection successful."
+            # Get cluster info
+            echo "Cluster information:"
+            kubectl cluster-info
+          else
+            echo "Cannot connect to Kubernetes. Please check your Kubernetes installation."
+          fi
+
+      # Start Minikube if it's not running
+      - name: Start Minikube
+        run: |
+          echo "Checking if Minikube is running..."
+          if command -v minikube &> /dev/null; then
+            MINIKUBE_RUNNING=false
+
+            # Check if minikube status reports running
+            if minikube status | grep -q "Running"; then
+              echo "Minikube status reports running. Verifying connectivity..."
+
+              # Update kubectl config from minikube
+              minikube update-context
+
+              # Try to connect to the cluster
+              if kubectl cluster-info &>/dev/null; then
+                echo "✅ Minikube is running and accessible."
+                MINIKUBE_RUNNING=true
+              else
+                echo "⚠️ Minikube reports running but cluster is not accessible. Restarting..."
+                minikube delete
+                minikube start
+                MINIKUBE_RUNNING=true
+              fi
+            else
+              echo "Minikube is not running. Starting Minikube..."
+              minikube start
+              MINIKUBE_RUNNING=true
+            fi
+
+            # Enable required addons after start/restart
+            if [ "$MINIKUBE_RUNNING" = true ]; then
+              echo "Ensuring required Minikube addons are enabled..."
+              minikube addons enable storage-provisioner
+              minikube addons enable default-storageclass
+
+              # Update kubectl config to ensure we have the latest cluster info
+              minikube update-context
+
+              # Ensure kubectl is using minikube context
+              echo "Setting kubectl context to minikube..."
+              kubectl config use-context minikube
+
+              # Verify connection to minikube cluster
+              echo "Verifying connection to Minikube cluster..."
+              kubectl cluster-info
+              echo "✅ Minikube is ready."
+            fi
+          else
+            echo "Minikube is not installed. Will rely on existing Kubernetes setup."
+          fi
+
+      # Build the Spring Boot application
+      - name: Build Spring Boot application
+        run: |
+          echo "Building Spring Boot application with Gradle..."
+          ./gradlew clean build -x test
+
+          # Verify JAR was created
+          JAR_FILE=$(ls build/libs/*.jar | head -1)
+          if [ -z "$JAR_FILE" ]; then
+            echo "❌ Build failed - JAR file not found"
+            exit 1
+          fi
+
+          echo "✅ JAR file built: $JAR_FILE"
+
+      # Build Docker image in Minikube's Docker daemon
+      - name: Build Docker image
+        working-directory: ${{ env.MANIFEST_DIR }}
+        run: |
+          echo "Building Docker image for Solace Service..."
+
+          # If using Minikube, use its Docker daemon
+          if command -v minikube &> /dev/null && minikube status | grep -q "Running"; then
+            echo "Using Minikube's Docker daemon..."
+            eval $(minikube docker-env)
+          fi
+
+          # Build the image
+          ./build-image.sh
+
+          echo "✅ Docker image built successfully"
+
+      # Update ConfigMap with workflow inputs
+      - name: Update ConfigMap
+        working-directory: ${{ env.MANIFEST_DIR }}
+        run: |
+          # Update Azure Storage setting
+          sed -i "s|AZURE_STORAGE_ENABLED: \".*\"|AZURE_STORAGE_ENABLED: \"${{ env.AZURE_STORAGE_ENABLED }}\"|g" 01-configmap.yaml
+
+          echo "ConfigMap updated with AZURE_STORAGE_ENABLED=${{ env.AZURE_STORAGE_ENABLED }}"
+
+      # Create or update Kubernetes secrets
+      - name: Create Kubernetes secrets
+        run: |
+          kubectl create namespace solace-service --dry-run=client -o yaml | kubectl apply -f -
+
+          # Create solace-service-secret
+          kubectl create secret generic solace-service-secret \
+            --from-literal=SOLACE_USERNAME="default" \
+            --from-literal=SOLACE_PASSWORD="default" \
+            --from-literal=AZURE_STORAGE_CONNECTION_STRING='${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}' \
+            -n solace-service --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "✅ Secrets created/updated"
+
+      # Check for existing deployment
+      - name: Check for existing deployment
+        run: |
+          if kubectl get namespace solace-service &>/dev/null; then
+            echo "Solace service namespace already exists. Will update existing deployment."
+          else
+            echo "No existing Solace service deployment found. Will create new deployment."
+          fi
+
+      # Deploy to Kubernetes
+      - name: Deploy to Kubernetes
+        working-directory: ${{ env.MANIFEST_DIR }}
+        run: |
+          echo "Deploying to Kubernetes cluster..."
+
+          # Apply manifests
+          kubectl apply -f 00-namespace.yaml
+          kubectl apply -f 01-configmap.yaml
+          kubectl apply -f 02-secrets.yaml
+          kubectl apply -f 03-deployment.yaml
+          kubectl apply -f 04-service.yaml
+
+          echo "✅ Manifests applied"
+
+      # Force a rolling restart of the deployment
+      - name: Force rolling restart
+        run: |
+          echo "Forcing a rolling restart of the Solace service deployment..."
+          # This will cause all pods to be recreated with the latest image
+          kubectl rollout restart deployment/solace-service -n solace-service
+          # Wait for the rollout to complete
+          kubectl rollout status deployment/solace-service -n solace-service --timeout=300s
+
+      # Display service information
+      - name: Display service information
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 10
+
+          # Get service details
+          echo "Solace Service Details:"
+          kubectl get svc -n solace-service
+
+          # Get NodePort
+          NODE_PORT=$(kubectl get svc solace-service -n solace-service -o jsonpath='{.spec.ports[0].nodePort}')
+
+          if [ -n "$NODE_PORT" ]; then
+            # Check if we're using Minikube
+            if command -v minikube &> /dev/null && minikube status | grep -q "Running"; then
+              MINIKUBE_IP=$(minikube ip)
+              echo "Solace service is available at http://$MINIKUBE_IP:$NODE_PORT"
+            else
+              echo "Solace service is available at http://localhost:$NODE_PORT"
+            fi
+          else
+            # Try ClusterIP if NodePort isn't available
+            CLUSTER_IP=$(kubectl get svc solace-service -n solace-service -o jsonpath='{.spec.clusterIP}')
+            PORT=$(kubectl get svc solace-service -n solace-service -o jsonpath='{.spec.ports[0].port}')
+
+            if [ -n "$CLUSTER_IP" ] && [ -n "$PORT" ]; then
+              echo "Solace service is available within the cluster at http://$CLUSTER_IP:$PORT"
+              echo "Use port forwarding to access: kubectl port-forward svc/solace-service -n solace-service $PORT:$PORT"
+            else
+              echo "Could not determine Solace service address. Check deployment manually."
+            fi
+          fi
+
+          # List all pods
+          echo "All pods:"
+          kubectl get pods -n solace-service -o wide
+
+      # Verify deployment health
+      - name: Verify deployment health
+        run: |
+          echo "Verifying deployment health..."
+
+          # Wait a bit for pods to stabilize
+          sleep 15
+
+          # Check if all pods are running
+          TOTAL_PODS=$(kubectl get pods -n solace-service --no-headers 2>/dev/null | wc -l)
+          RUNNING_PODS=$(kubectl get pods -n solace-service --no-headers 2>/dev/null | grep "Running" | wc -l)
+
+          echo "Total pods: $TOTAL_PODS, Running pods: $RUNNING_PODS"
+
+          if [ "$RUNNING_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt 0 ]; then
+            echo "✅ All pods are running. Deployment successful!"
+          else
+            echo "⚠️ Warning: Not all pods are running. Check the logs for more details."
+
+            # List non-running pods
+            echo "Non-running pods:"
+            kubectl get pods -n solace-service --field-selector status.phase!=Running
+
+            # Show logs for the Solace service pod if it exists
+            if kubectl get pods -n solace-service -l app=solace-service &>/dev/null; then
+              echo "Solace service logs:"
+              kubectl logs -n solace-service -l app=solace-service --tail=50 || true
+            fi
+          fi
+
+      # Test the deployment
+      - name: Test deployment
+        run: |
+          echo "Testing the deployment..."
+
+          # Get the NodePort
+          NODE_PORT=$(kubectl get svc solace-service -n solace-service -o jsonpath='{.spec.ports[0].nodePort}')
+
+          if [ -n "$NODE_PORT" ]; then
+            # Determine the service URL
+            if command -v minikube &> /dev/null && minikube status | grep -q "Running"; then
+              MINIKUBE_IP=$(minikube ip)
+              SERVICE_URL="http://$MINIKUBE_IP:$NODE_PORT"
+            else
+              SERVICE_URL="http://localhost:$NODE_PORT"
+            fi
+
+            echo "Testing health endpoint at: $SERVICE_URL/actuator/health"
+
+            # Wait for the service to be ready
+            for i in {1..30}; do
+              if curl -f -s "$SERVICE_URL/actuator/health" > /dev/null; then
+                echo "✅ Health check passed!"
+                curl -s "$SERVICE_URL/actuator/health" | head -20
+                break
+              else
+                echo "Waiting for service to be ready... ($i/30)"
+                sleep 5
+              fi
+            done
+          else
+            echo "⚠️ NodePort not found. Skipping health check."
+          fi

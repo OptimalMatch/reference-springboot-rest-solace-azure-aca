@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solace-service
+  labels:
+    name: solace-service
+    environment: development
