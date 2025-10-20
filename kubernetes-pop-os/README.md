@@ -2,6 +2,17 @@
 
 This directory contains Kubernetes manifests and deployment scripts for running the Solace Service on a local Kubernetes cluster (Minikube, MicroK8s, or K3s) on Pop OS Linux.
 
+## ⚠️ GitHub Actions Workflow Status
+
+The GitHub Actions workflow (`.github/workflows/pop-os-1-deploy.yml`) is **DISABLED** and kept for reference only.
+
+**Why it's disabled:**
+- kubectl commands timeout when run from the github-runner user on shared Minikube clusters
+- Manual deployment is safer for shared clusters with production workloads (18+ pods)
+- Manual deployment gives better visibility and control
+
+**Recommended approach:** Use manual deployment (see below)
+
 ## Prerequisites
 
 1. **Kubernetes** - One of the following:
@@ -171,13 +182,27 @@ kubectl get events -n solace-service --sort-by='.lastTimestamp'
 - `build-image.sh`: Script to build Docker image
 - `deploy-local.sh`: Automated deployment script
 
-## GitHub Actions
+## GitHub Actions (Disabled)
 
-The service can be automatically deployed via GitHub Actions. See the workflow file at `.github/workflows/pop-os-1-deploy.yml`.
+⚠️ **The GitHub Actions workflow is disabled.** Use manual deployment instead.
 
-The workflow triggers on:
-- Push to `main` branch
-- Manual workflow dispatch
+The workflow file at `.github/workflows/pop-os-1-deploy.yml` is kept for reference but will not run automatically. It encountered kubectl connectivity issues between the GitHub Actions runner and Minikube on shared clusters.
+
+### Why Manual Deployment is Better for pop-os-1
+
+1. **Shared cluster safety**: pop-os-1 hosts 18+ pods from multiple applications (rag-service, solace-service)
+2. **Better control**: You can see exactly what's being deployed
+3. **Faster troubleshooting**: Direct access to logs and kubectl commands
+4. **No authentication issues**: Runs with your user credentials
+
+### Manual Deployment (Recommended)
+
+```bash
+cd kubernetes-pop-os
+./deploy-local.sh
+```
+
+This is the recommended and fully tested deployment method for pop-os-1.
 
 ## Troubleshooting
 
