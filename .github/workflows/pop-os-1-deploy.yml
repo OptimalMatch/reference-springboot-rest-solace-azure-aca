@@ -1,45 +1,36 @@
-# This workflow will deploy the Solace Service to a self-hosted Kubernetes cluster on Pop OS
+# ⚠️ THIS WORKFLOW IS DISABLED ⚠️
 #
-# To configure this workflow:
+# This workflow is kept for reference but is disabled due to kubectl connectivity
+# issues between the GitHub Actions runner and Minikube on the shared cluster.
 #
-# 1. Set up a self-hosted GitHub runner on your Pop OS server
-#    - Follow instructions at: https://docs.github.com/en/actions/hosting-your-own-runners
-#    - Tag the runner with 'pop-os-1' label
+# RECOMMENDED APPROACH: Use manual deployment
+# cd kubernetes-pop-os && ./deploy-local.sh
 #
-# 2. Ensure the runner has access to:
-#    - Docker
-#    - kubectl
-#    - Java 21 (for building the application)
-#    - A running Kubernetes cluster (MicroK8s, K3s, or Minikube)
-#    - Proper permissions to create/modify resources in the cluster
+# See kubernetes-pop-os/README.md for complete instructions.
+#
+# ============================================================================
+# Original workflow configuration (for reference):
+# ============================================================================
+#
+# This workflow would deploy the Solace Service to a self-hosted Kubernetes
+# cluster on Pop OS, but kubectl commands timeout when run from the
+# github-runner user even with proper configuration.
+#
+# Manual deployment works perfectly and is safer for shared clusters with
+# production workloads (18+ pods from multiple applications).
 
-name: Deploy to Pop OS Kubernetes pop-os-1
+name: Deploy to Pop OS Kubernetes pop-os-1 (DISABLED)
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "src/**"
-      - "build.gradle"
-      - "kubernetes-pop-os/**"
-      - ".github/workflows/pop-os-1-deploy.yml"
+  # Disabled: workflow_dispatch only, no automatic triggers
   workflow_dispatch:
     inputs:
-      solace_enabled:
-        description: 'Enable Solace broker connection'
-        required: false
+      force_run:
+        description: 'This workflow is disabled. Use manual deployment instead.'
+        required: true
         default: 'false'
         type: choice
         options:
-          - 'true'
-          - 'false'
-      azure_storage_enabled:
-        description: 'Enable Azure Blob Storage'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
           - 'false'
 
 env:
@@ -49,9 +40,9 @@ env:
 
 jobs:
   deploy:
-    name: Deploy to Pop OS Kubernetes pop-os-1
-    # Ensure this job only runs on runners with the 'pop-os-1' label
-    # This ensures the workflow only runs on the designated Pop OS server
+    name: Deploy to Pop OS Kubernetes pop-os-1 (DISABLED)
+    # This workflow is disabled - see header comments for details
+    if: false  # Always skip this job
     runs-on: [self-hosted, pop-os-1]
 
     steps:

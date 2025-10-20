@@ -171,19 +171,18 @@ See [AKS Deployment Guide](AKS-DEPLOYMENT-GUIDE.md) for complete instructions.
 Deploy to a local Kubernetes cluster on Pop OS or similar Linux distributions:
 
 ```bash
-# Automated deployment
+# Manual deployment (recommended for pop-os-1)
 cd kubernetes-pop-os
 ./deploy-local.sh
-
-# Or use GitHub Actions for automated deployment to pop-os-1
-# Configure self-hosted runner with 'pop-os-1' label
 ```
 
 **Features:**
 - Automated local Kubernetes deployment
 - Support for Minikube, MicroK8s, and K3s
-- GitHub Actions integration for CI/CD
 - NodePort service for easy local access
+- Complete control and visibility
+
+**Note:** GitHub Actions workflow is disabled for pop-os-1 due to kubectl connectivity issues on shared clusters. Manual deployment is the recommended approach.
 
 See [kubernetes-pop-os/README.md](kubernetes-pop-os/README.md) for complete instructions.
 
