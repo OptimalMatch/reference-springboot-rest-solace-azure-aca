@@ -72,57 +72,53 @@ jobs:
             echo "Cannot connect to Kubernetes. Please check your Kubernetes installation."
           fi
 
-      # Start Minikube if it's not running
-      - name: Start Minikube
+      # Verify or start Minikube
+      - name: Verify Minikube
         run: |
-          echo "Checking if Minikube is running..."
-          if command -v minikube &> /dev/null; then
-            MINIKUBE_RUNNING=false
+          echo "Checking Kubernetes cluster availability..."
 
-            # Check if minikube status reports running
-            if minikube status | grep -q "Running"; then
-              echo "Minikube status reports running. Verifying connectivity..."
+          # First, try to connect to the cluster directly
+          if kubectl cluster-info &>/dev/null; then
+            echo "✅ Kubernetes cluster is accessible via kubectl"
+            kubectl cluster-info
 
-              # Update kubectl config from minikube
-              minikube update-context
-
-              # Try to connect to the cluster
-              if kubectl cluster-info &>/dev/null; then
-                echo "✅ Minikube is running and accessible."
-                MINIKUBE_RUNNING=true
-              else
-                echo "⚠️ Minikube reports running but cluster is not accessible. Restarting..."
-                minikube delete
-                minikube start
-                MINIKUBE_RUNNING=true
-              fi
+            # Verify it's Minikube by checking the current context
+            CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+            if [ "$CURRENT_CONTEXT" = "minikube" ]; then
+              echo "✅ Using Minikube cluster"
             else
-              echo "Minikube is not running. Starting Minikube..."
-              minikube start
-              MINIKUBE_RUNNING=true
-            fi
-
-            # Enable required addons after start/restart
-            if [ "$MINIKUBE_RUNNING" = true ]; then
-              echo "Ensuring required Minikube addons are enabled..."
-              minikube addons enable storage-provisioner
-              minikube addons enable default-storageclass
-
-              # Update kubectl config to ensure we have the latest cluster info
-              minikube update-context
-
-              # Ensure kubectl is using minikube context
-              echo "Setting kubectl context to minikube..."
-              kubectl config use-context minikube
-
-              # Verify connection to minikube cluster
-              echo "Verifying connection to Minikube cluster..."
-              kubectl cluster-info
-              echo "✅ Minikube is ready."
+              echo "⚠️ Current context is: $CURRENT_CONTEXT"
+              # Try to switch to minikube context if it exists
+              if kubectl config get-contexts minikube &>/dev/null; then
+                echo "Switching to minikube context..."
+                kubectl config use-context minikube
+              fi
             fi
           else
-            echo "Minikube is not installed. Will rely on existing Kubernetes setup."
+            echo "Cluster not accessible. Checking if Minikube is available..."
+
+            if command -v minikube &> /dev/null; then
+              echo "Minikube is installed. Attempting to update context..."
+
+              # Try to update context first (doesn't require SSH)
+              minikube update-context 2>/dev/null || true
+              kubectl config use-context minikube 2>/dev/null || true
+
+              # Check if cluster is now accessible
+              if kubectl cluster-info &>/dev/null; then
+                echo "✅ Cluster is now accessible"
+              else
+                echo "Starting Minikube (this may take a few minutes)..."
+                minikube start --force
+              fi
+            else
+              echo "❌ No Kubernetes cluster available"
+              exit 1
+            fi
           fi
+
+          echo "✅ Kubernetes cluster is ready"
+          kubectl get nodes
 
       # Build the Spring Boot application
       - name: Build Spring Boot application
