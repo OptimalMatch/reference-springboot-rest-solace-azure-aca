@@ -5,10 +5,12 @@
 
 # Build artifacts
 build/
+!build/libs/*.jar
 target/
 .gradle/
 *.class
 *.jar
+!build/libs/*.jar
 *.war
 
 # IDE
