@@ -18,7 +18,8 @@ echo -e "${YELLOW}Building application with Gradle...${NC}"
 ./gradlew clean build -x test
 
 # Check if build was successful
-if [ ! -f build/libs/*.jar ]; then
+JAR_COUNT=$(ls build/libs/*.jar 2>/dev/null | wc -l)
+if [ "$JAR_COUNT" -eq 0 ]; then
     echo -e "${RED}Build failed - JAR file not found${NC}"
     exit 1
 fi
@@ -36,7 +37,7 @@ if command -v minikube &> /dev/null && minikube status | grep -q "Running"; then
     eval $(minikube docker-env)
 fi
 
-# Build the image
+# Build the image from project root with proper context
 docker build -t solace-service:local -f kubernetes-pop-os/Dockerfile.local .
 
 echo -e "${GREEN}Docker image built successfully: solace-service:local${NC}"
