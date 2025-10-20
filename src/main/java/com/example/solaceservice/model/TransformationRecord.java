@@ -1,6 +1,7 @@
 package com.example.solaceservice.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -280,6 +281,7 @@ public class TransformationRecord {
      *
      * @return true if status is SUCCESS or PARTIAL_SUCCESS
      */
+    @JsonIgnore
     public boolean isSuccessful() {
         return status != null && status.isSuccess();
     }
@@ -289,6 +291,7 @@ public class TransformationRecord {
      *
      * @return true if status represents a failure
      */
+    @JsonIgnore
     public boolean isFailed() {
         return status != null && status.isFailure();
     }
@@ -298,6 +301,7 @@ public class TransformationRecord {
      *
      * @return processing time, or 0 if not set
      */
+    @JsonIgnore
     public long getTotalProcessingTime() {
         return processingTimeMs != null ? processingTimeMs : 0L;
     }
@@ -307,6 +311,7 @@ public class TransformationRecord {
      *
      * @return human-readable summary string
      */
+    @JsonIgnore
     public String getSummary() {
         return String.format("[%s] %s (%s → %s) %s in %dms",
             transformationId,

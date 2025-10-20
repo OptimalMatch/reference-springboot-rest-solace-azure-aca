@@ -3,6 +3,8 @@ package com.example.solaceservice.listener;
 import com.example.solaceservice.model.*;
 import com.example.solaceservice.service.AzureStorageService;
 import com.example.solaceservice.service.SwiftTransformerService;
+import com.example.solaceservice.service.TransformationRetryService;
+import com.example.solaceservice.service.TransformationMetricsService;
 import jakarta.jms.JMSException;
 import jakarta.jms.Message;
 import jakarta.jms.TextMessage;
@@ -59,8 +61,17 @@ public class MessageTransformationListener {
     @Autowired(required = false)
     private AzureStorageService azureStorageService;
 
+    @Autowired(required = false)
+    private TransformationRetryService retryService;
+
+    @Autowired(required = false)
+    private TransformationMetricsService metricsService;
+
     @Value("${transformation.output-queue:swift/mt202/outbound}")
     private String outputQueue;
+
+    @Value("${transformation.input-queue:swift/mt103/inbound}")
+    private String inputQueue;
 
     @Value("${transformation.transformation-type:MT103_TO_MT202}")
     private String transformationTypeStr;
@@ -138,13 +149,39 @@ public class MessageTransformationListener {
             // If transformation successful, publish to output queue
             if (result.isSuccessful() && jmsTemplate != null) {
                 publishToOutputQueue(record, result.getTransformedMessage());
+                // Store successful transformation
+                if (storeResults && azureStorageService != null) {
+                    storeTransformationRecord(record);
+                }
+                // Record metrics
+                if (metricsService != null) {
+                    metricsService.recordTransformation(transformationType, result.getStatus(), transformDuration);
+                }
             } else if (result.isFailed()) {
                 log.error("Transformation failed for message {}: {}", inputMessageId, result.getErrorMessage());
-            }
 
-            // Store transformation record to Azure (asynchronously)
-            if (storeResults && azureStorageService != null) {
-                storeTransformationRecord(record);
+                // Record metrics
+                if (metricsService != null) {
+                    metricsService.recordTransformation(transformationType, result.getStatus(), transformDuration);
+                }
+
+                // Check if retry should be attempted
+                if (retryService != null && retryService.shouldRetry(record)) {
+                    log.info("Scheduling retry for failed transformation: {}", inputMessageId);
+                    retryService.scheduleRetry(
+                        inputContent,
+                        transformationType,
+                        inputQueue,
+                        outputQueue,
+                        correlationId,
+                        inputMessageId
+                    );
+                } else {
+                    // No retry - store the failure
+                    if (storeResults && azureStorageService != null) {
+                        storeTransformationRecord(record);
+                    }
+                }
             }
 
         } catch (JMSException e) {
