@@ -81,28 +81,28 @@ jobs:
           if [ ! -f ~/.kube/config ]; then
             echo "Setting up kubectl config..."
             mkdir -p ~/.kube
-            cat > ~/.kube/config << 'KUBECONFIG'
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority: /home/unidatum/.minikube/ca.crt
-    server: https://192.168.49.2:8443
-  name: minikube
-contexts:
-- context:
-    cluster: minikube
-    namespace: default
-    user: minikube
-  name: minikube
-current-context: minikube
-kind: Config
-preferences: {}
-users:
-- name: minikube
-  user:
-    client-certificate: /home/unidatum/.minikube/profiles/minikube/client.crt
-    client-key: /home/unidatum/.minikube/profiles/minikube/client.key
-KUBECONFIG
+            cat > ~/.kube/config <<'EOF'
+          apiVersion: v1
+          clusters:
+          - cluster:
+              certificate-authority: /home/unidatum/.minikube/ca.crt
+              server: https://192.168.49.2:8443
+            name: minikube
+          contexts:
+          - context:
+              cluster: minikube
+              namespace: default
+              user: minikube
+            name: minikube
+          current-context: minikube
+          kind: Config
+          preferences: {}
+          users:
+          - name: minikube
+            user:
+              client-certificate: /home/unidatum/.minikube/profiles/minikube/client.crt
+              client-key: /home/unidatum/.minikube/profiles/minikube/client.key
+          EOF
             chmod 600 ~/.kube/config
           fi
 
