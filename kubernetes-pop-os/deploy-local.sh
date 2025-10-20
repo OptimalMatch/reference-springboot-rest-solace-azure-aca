@@ -95,7 +95,28 @@ echo -e "${GREEN}Creating ConfigMap and Secrets...${NC}"
 $KUBECTL_CMD apply -f 01-configmap.yaml
 $KUBECTL_CMD apply -f 02-secrets.yaml
 
-# Apply deployment
+# Deploy infrastructure (Solace broker and Azurite)
+echo -e "${GREEN}Deploying Solace broker...${NC}"
+$KUBECTL_CMD apply -f 05-solace-broker.yaml
+
+echo -e "${GREEN}Deploying Azurite (Azure Storage emulator)...${NC}"
+$KUBECTL_CMD apply -f 06-azurite.yaml
+
+# Wait for infrastructure to be ready
+echo -e "${YELLOW}Waiting for Solace broker to be ready...${NC}"
+$KUBECTL_CMD -n solace-service rollout status deployment/solace-broker --timeout=300s
+
+echo -e "${YELLOW}Waiting for Azurite to be ready...${NC}"
+$KUBECTL_CMD -n solace-service rollout status deployment/azurite --timeout=180s
+
+# Initialize Solace queues
+echo -e "${GREEN}Initializing Solace queues...${NC}"
+$KUBECTL_CMD apply -f 07-solace-init-job.yaml
+
+echo -e "${YELLOW}Waiting for Solace initialization to complete...${NC}"
+$KUBECTL_CMD -n solace-service wait --for=condition=complete --timeout=120s job/solace-init
+
+# Apply application deployment
 echo -e "${GREEN}Deploying application...${NC}"
 $KUBECTL_CMD apply -f 03-deployment.yaml
 
@@ -103,8 +124,8 @@ $KUBECTL_CMD apply -f 03-deployment.yaml
 echo -e "${GREEN}Creating service...${NC}"
 $KUBECTL_CMD apply -f 04-service.yaml
 
-# Wait for deployment to be ready
-echo -e "${YELLOW}Waiting for deployment to be ready...${NC}"
+# Wait for application deployment to be ready
+echo -e "${YELLOW}Waiting for application deployment to be ready...${NC}"
 $KUBECTL_CMD -n solace-service rollout status deployment/solace-service --timeout=300s
 
 # Get service information
@@ -112,16 +133,29 @@ echo -e "${GREEN}Deployment completed successfully!${NC}"
 echo -e "${GREEN}Service information:${NC}"
 $KUBECTL_CMD -n solace-service get svc
 
-# Get NodePort
+# Get NodePort for the application
 NODE_PORT=$($KUBECTL_CMD get svc solace-service -n solace-service -o jsonpath='{.spec.ports[0].nodePort}')
+SOLACE_WEB_PORT=$($KUBECTL_CMD get svc solace-broker -n solace-service -o jsonpath='{.spec.ports[0].nodePort}')
+AZURITE_BLOB_PORT=$($KUBECTL_CMD get svc azurite -n solace-service -o jsonpath='{.spec.ports[0].nodePort}')
 
 if [ -n "$NODE_PORT" ]; then
     if [ "$KUBE_PROVIDER" = "minikube" ]; then
         MINIKUBE_IP=$(minikube ip)
-        echo -e "${GREEN}Solace service is available at: http://${MINIKUBE_IP}:${NODE_PORT}${NC}"
-        echo -e "${GREEN}Or use port forwarding: minikube service solace-service -n solace-service${NC}"
+        echo -e "${GREEN}===============================================${NC}"
+        echo -e "${GREEN}Application: http://${MINIKUBE_IP}:${NODE_PORT}${NC}"
+        echo -e "${GREEN}Solace Admin Console: http://${MINIKUBE_IP}:${SOLACE_WEB_PORT}${NC}"
+        echo -e "${GREEN}  Username: admin${NC}"
+        echo -e "${GREEN}  Password: admin${NC}"
+        echo -e "${GREEN}Azurite Blob Storage: http://${MINIKUBE_IP}:${AZURITE_BLOB_PORT}${NC}"
+        echo -e "${GREEN}===============================================${NC}"
     else
-        echo -e "${GREEN}Solace service is available at: http://localhost:${NODE_PORT}${NC}"
+        echo -e "${GREEN}===============================================${NC}"
+        echo -e "${GREEN}Application: http://localhost:${NODE_PORT}${NC}"
+        echo -e "${GREEN}Solace Admin Console: http://localhost:${SOLACE_WEB_PORT}${NC}"
+        echo -e "${GREEN}  Username: admin${NC}"
+        echo -e "${GREEN}  Password: admin${NC}"
+        echo -e "${GREEN}Azurite Blob Storage: http://localhost:${AZURITE_BLOB_PORT}${NC}"
+        echo -e "${GREEN}===============================================${NC}"
     fi
 else
     echo -e "${YELLOW}NodePort not available. Use port forwarding:${NC}"
@@ -134,4 +168,6 @@ $KUBECTL_CMD -n solace-service get pods -o wide
 
 echo -e "${GREEN}Deployment complete!${NC}"
 echo -e "${YELLOW}To view logs: kubectl logs -n solace-service -l app=solace-service -f${NC}"
-echo -e "${YELLOW}To test the service: curl http://localhost:${NODE_PORT}/actuator/health${NC}"
+echo -e "${YELLOW}To test the service:${NC}"
+echo -e "${YELLOW}  Health check: curl http://localhost:${NODE_PORT}/actuator/health${NC}"
+echo -e "${YELLOW}  Send message: curl -X POST http://localhost:${NODE_PORT}/api/messages -H 'Content-Type: application/json' -d '{\"content\":\"Test\",\"destination\":\"test/topic\"}'${NC}"

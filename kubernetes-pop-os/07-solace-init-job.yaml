@@ -1,0 +1,84 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solace-init-script
+  namespace: solace-service
+data:
+  init-solace.sh: |
+    #!/bin/sh
+    set -e
+
+    SOLACE_HOST="${SOLACE_HOST:-solace-broker}"
+    SOLACE_PORT="${SOLACE_PORT:-8080}"
+    SOLACE_USER="${SOLACE_USER:-admin}"
+    SOLACE_PASS="${SOLACE_PASS:-admin}"
+    VPN_NAME="${VPN_NAME:-default}"
+    QUEUE_NAME="${QUEUE_NAME:-test/topic}"
+
+    echo "Waiting for Solace broker to be ready..."
+    for i in $(seq 1 30); do
+      if nc -z $SOLACE_HOST 8080 2>/dev/null; then
+        echo "Solace broker is reachable"
+        break
+      fi
+      echo "Waiting for Solace broker... ($i/30)"
+      sleep 5
+    done
+
+    # Wait a bit more for Solace to fully initialize
+    sleep 10
+
+    echo "Creating queue: $QUEUE_NAME in VPN: $VPN_NAME"
+
+    # Create queue using SEMP v2 API
+    curl -X POST "http://$SOLACE_HOST:$SOLACE_PORT/SEMP/v2/config/msgVpns/$VPN_NAME/queues" \
+      -u "$SOLACE_USER:$SOLACE_PASS" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"queueName\": \"$QUEUE_NAME\",
+        \"accessType\": \"exclusive\",
+        \"maxMsgSpoolUsage\": 200,
+        \"permission\": \"delete\",
+        \"ingressEnabled\": true,
+        \"egressEnabled\": true
+      }" || echo "Queue may already exist or there was an error"
+
+    echo "Queue initialization completed"
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: solace-init
+  namespace: solace-service
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: init
+        image: curlimages/curl:latest
+        command: ["/bin/sh", "/scripts/init-solace.sh"]
+        env:
+        - name: SOLACE_HOST
+          value: "solace-broker"
+        - name: SOLACE_PORT
+          value: "8080"
+        - name: SOLACE_USER
+          value: "admin"
+        - name: SOLACE_PASS
+          value: "admin"
+        - name: VPN_NAME
+          value: "default"
+        - name: QUEUE_NAME
+          value: "test/topic"
+        volumeMounts:
+        - name: script
+          mountPath: /scripts
+      volumes:
+      - name: script
+        configMap:
+          name: solace-init-script
+          defaultMode: 0755

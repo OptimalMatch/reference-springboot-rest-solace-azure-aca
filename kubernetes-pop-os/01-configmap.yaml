@@ -9,12 +9,14 @@ data:
   SPRING_PROFILES_ACTIVE: "local"
 
   # Solace settings (can be overridden by secrets)
+  SOLACE_ENABLED: "true"
   SOLACE_HOST: "tcp://solace-broker:55555"
   SOLACE_VPN: "default"
-  SOLACE_QUEUE_NAME: "test.queue"
+  SOLACE_QUEUE_NAME: "test/topic"
+  SOLACE_TOPIC: "test/topic"
 
   # Azure Storage settings
-  AZURE_STORAGE_ENABLED: "false"
+  AZURE_STORAGE_ENABLED: "true"
   AZURE_STORAGE_CONTAINER_NAME: "solace-messages"
 
   # Logging
