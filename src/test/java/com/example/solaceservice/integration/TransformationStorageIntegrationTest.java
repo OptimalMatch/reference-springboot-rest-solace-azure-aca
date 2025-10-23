@@ -175,12 +175,8 @@ class TransformationStorageIntegrationTest {
 
         // Then - verify transformation record is stored
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient("solace-messages");
-        BlobClient transformationBlob = containerClient.listBlobs()
-                .stream()
-                .filter(blob -> blob.getName().startsWith("transformation-"))
-                .findFirst()
-                .map(blob -> containerClient.getBlobClient(blob.getName()))
-                .orElseThrow(() -> new AssertionError("Transformation blob not found"));
+        String transformationId = record.getTransformationId();
+        BlobClient transformationBlob = containerClient.getBlobClient("transformation-" + transformationId + ".json");
 
         // Download and parse transformation record
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
