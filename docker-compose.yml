@@ -30,7 +30,7 @@ services:
       #start_period: 10s
 
   solace-broker:
-    image: solace/solace-pubsub-standard:latest
+    image: solace/solace-pubsub-standard:10.25.7
     container_name: solace-broker
     hostname: solace-broker
     ports:

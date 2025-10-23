@@ -8,7 +8,7 @@ import java.time.Duration;
 
 public class SolaceTestContainer extends GenericContainer<SolaceTestContainer> {
 
-    private static final String SOLACE_IMAGE = "solace/solace-pubsub-standard:latest";
+    private static final String SOLACE_IMAGE = "solace/solace-pubsub-standard:10.25.7";
     private static final int SOLACE_PORT = 55555;
     private static final int SOLACE_SEMP_PORT = 8080;
 
