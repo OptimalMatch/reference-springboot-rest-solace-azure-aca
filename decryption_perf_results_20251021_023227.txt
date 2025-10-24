@@ -1,0 +1,25 @@
+Decryption Performance Test Results
+====================================
+Timestamp: Tue Oct 21 02:32:30 AM CDT 2025
+
+PHASE 1 - Message Creation:
+  Target Messages: 100
+  Created Messages: 100
+  Creation Time: .249140206s
+  Creation Throughput: 401.38 msg/sec
+
+PHASE 2 - Decryption Test:
+  Messages Tested: 100
+  Target Time: 30s
+  Actual Time: .214608854s
+  Success: 100
+  Failed: 0
+  Success Rate: 100.00%
+  Decryption Throughput: 465.96 msg/sec
+  Parallel Jobs: 20
+
+Decryption Latency Statistics:
+  Average: 35.44ms
+  P50: 34.5785ms
+  P95: 51.0545ms
+  P99: 54.6859ms
