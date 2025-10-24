@@ -45,13 +45,50 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TransformationStorageIntegrationTest {
 
     @Container
-    static GenericContainer<?> azuriteContainer = new GenericContainer<>(
-            new ImageFromDockerfile()
-                    .withDockerfile(Paths.get("Azurite-3.35.0/Dockerfile")))
-            .withExposedPorts(10000, 10001, 10002)
-            .withCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data")
-            .waitingFor(Wait.forListeningPort()
-                    .withStartupTimeout(java.time.Duration.ofSeconds(30)));
+    static GenericContainer<?> azuriteContainer = createAzuriteContainer();
+
+    /**
+     * Creates an Azurite container with proxy support for firewalled networks.
+     * Reads HTTP_PROXY, HTTPS_PROXY, and NO_PROXY from environment variables
+     * and passes them as build args to the Dockerfile.
+     */
+    private static GenericContainer<?> createAzuriteContainer() {
+        ImageFromDockerfile image = new ImageFromDockerfile()
+                .withDockerfile(Paths.get("Azurite-3.35.0/Dockerfile"));
+
+        // Pass proxy settings from environment to Docker build
+        String httpProxy = System.getenv("HTTP_PROXY");
+        String httpsProxy = System.getenv("HTTPS_PROXY");
+        String noProxy = System.getenv("NO_PROXY");
+        String httpProxyLower = System.getenv("http_proxy");
+        String httpsProxyLower = System.getenv("https_proxy");
+        String noProxyLower = System.getenv("no_proxy");
+
+        if (httpProxy != null) {
+            image.withBuildArg("HTTP_PROXY", httpProxy);
+        }
+        if (httpsProxy != null) {
+            image.withBuildArg("HTTPS_PROXY", httpsProxy);
+        }
+        if (noProxy != null) {
+            image.withBuildArg("NO_PROXY", noProxy);
+        }
+        if (httpProxyLower != null) {
+            image.withBuildArg("http_proxy", httpProxyLower);
+        }
+        if (httpsProxyLower != null) {
+            image.withBuildArg("https_proxy", httpsProxyLower);
+        }
+        if (noProxyLower != null) {
+            image.withBuildArg("no_proxy", noProxyLower);
+        }
+
+        return new GenericContainer<>(image)
+                .withExposedPorts(10000, 10001, 10002)
+                .withCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data")
+                .waitingFor(Wait.forListeningPort()
+                        .withStartupTimeout(java.time.Duration.ofSeconds(30)));
+    }
 
     // Mock all JMS listeners to avoid queue connection issues
     @MockitoBean(name = "messageTransformationListener")
