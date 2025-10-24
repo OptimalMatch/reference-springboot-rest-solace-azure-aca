@@ -1,0 +1,17 @@
+Performance Test Results (V2)
+==============================
+Timestamp: Tue Oct 14 03:37:06 AM CDT 2025
+Target Messages: 10000
+Target Time: 60s
+Elapsed Time: 8.706539412s
+Success: 10000
+Failed: 0
+Success Rate: 100.00%
+Throughput: 1148.56 msg/sec
+Parallel Jobs: 50
+
+Latency Statistics:
+  Average: 37.544ms
+  P50: 36.0365ms
+  P95: 51.5341ms
+  P99: 85.6809ms

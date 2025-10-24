@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
@@ -88,7 +88,7 @@ class SolaceAzureIntegrationTest {
     private TestRestTemplate restTemplate;
 
     // Mock the MessageListener so it doesn't consume messages during tests
-    @MockBean
+    @MockitoBean
     private MessageListener messageListener;
 
     private final ObjectMapper objectMapper = new ObjectMapper()

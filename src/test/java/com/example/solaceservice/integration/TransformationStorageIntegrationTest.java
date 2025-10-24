@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -54,13 +54,13 @@ class TransformationStorageIntegrationTest {
                     .withStartupTimeout(java.time.Duration.ofSeconds(30)));
 
     // Mock all JMS listeners to avoid queue connection issues
-    @MockBean(name = "messageTransformationListener")
+    @MockitoBean(name = "messageTransformationListener")
     private com.example.solaceservice.listener.MessageTransformationListener messageTransformationListener;
 
-    @MockBean(name = "deadLetterQueueListener")
+    @MockitoBean(name = "deadLetterQueueListener")
     private com.example.solaceservice.listener.DeadLetterQueueListener deadLetterQueueListener;
 
-    @MockBean(name = "messageListener")
+    @MockitoBean(name = "messageListener")
     private com.example.solaceservice.listener.MessageListener messageListener;
 
     @Autowired(required = false)
