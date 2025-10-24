@@ -20,12 +20,14 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
@@ -43,7 +45,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TransformationStorageIntegrationTest {
 
     @Container
-    static GenericContainer<?> azuriteContainer = new GenericContainer<>("mcr.microsoft.com/azure-storage/azurite:latest")
+    static GenericContainer<?> azuriteContainer = new GenericContainer<>(
+            new ImageFromDockerfile()
+                    .withDockerfile(Paths.get("Azurite-3.35.0/Dockerfile")))
             .withExposedPorts(10000, 10001, 10002)
             .withCommand("azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data")
             .waitingFor(Wait.forListeningPort()
